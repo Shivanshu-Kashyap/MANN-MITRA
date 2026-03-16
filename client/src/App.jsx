@@ -37,17 +37,12 @@ function App() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <Routes>
-        {/* Auth routes - no header */}
-        <Route path="/admin/login" element={<AdminLogin />} />
-        <Route path="/admin/signup" element={<AdminSignup />} />
-        <Route path="/counsellor/login" element={<CounsellorLogin />} />
-        
         {/* Dashboard routes - no header */}
         <Route path="/admin/dashboard" element={<AdminDashboardNew />} />
         <Route path="/counsellor/dashboard" element={<CounsellorDashboard />} />
         <Route path="/chat-platform" element={<ChatPlatform />} />
         
-        {/* Main app routes - with header */}
+        {/* Main app routes - with header and footer */}
         <Route path="*" element={
           <>
             <Header />
@@ -55,6 +50,9 @@ function App() {
               <Routes>
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
+                <Route path="/admin/login" element={<AdminLogin />} />
+                <Route path="/admin/signup" element={<AdminSignup />} />
+                <Route path="/counsellor/login" element={<CounsellorLogin />} />
                 <Route path="/" element={<Home />} />
                 <Route path="/screening" element={<Screening />} />
                 <Route path='/dashboard' element = {<StudentDashboard/>}/>

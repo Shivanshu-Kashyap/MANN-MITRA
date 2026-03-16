@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import image5 from '../assets/illustration.png'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
@@ -30,18 +31,10 @@ const AdminSignup = () => {
 
   const validatePassword = (password) => {
     const errors = []
-    if (password.length < 8) {
-      errors.push('Password must be at least 8 characters long')
-    }
-    if (!/[A-Z]/.test(password)) {
-      errors.push('Password must contain at least one uppercase letter')
-    }
-    if (!/[0-9]/.test(password)) {
-      errors.push('Password must contain at least one number')
-    }
-    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-      errors.push('Password must contain at least one symbol')
-    }
+    if (password.length < 8) errors.push('At least 8 characters long')
+    if (!/[A-Z]/.test(password)) errors.push('At least one uppercase letter')
+    if (!/[0-9]/.test(password)) errors.push('At least one number')
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) errors.push('At least one symbol')
     return errors
   }
 
@@ -51,14 +44,7 @@ const AdminSignup = () => {
       ...prev,
       [name]: value
     }))
-
-    // Validate password in real-time
-    if (name === 'password') {
-      const errors = validatePassword(value)
-      setPasswordErrors(errors)
-    }
-
-    // Clear error when user starts typing
+    if (name === 'password') setPasswordErrors(validatePassword(value))
     if (error) setError('')
   }
 
@@ -67,7 +53,6 @@ const AdminSignup = () => {
     setIsLoading(true)
     setError('')
 
-    // Validate password
     const passwordValidationErrors = validatePassword(formData.password)
     if (passwordValidationErrors.length > 0) {
       setError('Please fix password requirements')
@@ -75,7 +60,6 @@ const AdminSignup = () => {
       return
     }
 
-    // Check password confirmation
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match')
       setIsLoading(false)
@@ -85,9 +69,7 @@ const AdminSignup = () => {
     try {
       const response = await fetch(`${API_BASE}/v1/auth/admin/signup`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           collegeName: formData.collegeName.trim(),
           email: formData.email.trim().toLowerCase(),
@@ -101,9 +83,7 @@ const AdminSignup = () => {
       const data = await response.json()
 
       if (data.success) {
-        navigate('/admin/login', { 
-          state: { message: 'Admin account created successfully. Please login.' }
-        })
+        navigate('/admin/login', { state: { message: 'Admin account created successfully. Please login.' } })
       } else {
         const message = data.errors?.length
           ? data.errors.map(e => e.msg || e.message).join('. ')
@@ -118,219 +98,139 @@ const AdminSignup = () => {
     }
   }
 
+  const inputClass = "w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-700 focus:border-transparent transition-all bg-gray-50 hover:bg-white"
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-red-100 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-red-100">
-            <span className="text-2xl">🏛️</span>
-          </div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Admin Registration
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Create an administrative account for your institution
-          </p>
-        </div>
-
-        <form className="mt-8 space-y-6 bg-white p-8 rounded-xl shadow-lg" onSubmit={handleSubmit}>
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-md p-4">
-              <div className="flex">
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">
-                    Registration Failed
-                  </h3>
-                  <div className="mt-2 text-sm text-red-700">
-                    <p>{error}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-4">
-            {/* College Name */}
-            <div>
-              <label htmlFor="collegeName" className="block text-sm font-medium text-gray-700 mb-1">
-                College/Institution Name *
-              </label>
-              <input
-                id="collegeName"
-                name="collegeName"
-                type="text"
-                required
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500 focus:z-10 sm:text-sm"
-                placeholder="Enter your college/institution name"
-                value={formData.collegeName}
-                onChange={handleChange}
-              />
-            </div>
-
-            {/* Email */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                College Email ID *
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                required
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500 focus:z-10 sm:text-sm"
-                placeholder="admin@college.edu"
-                value={formData.email}
-                onChange={handleChange}
-              />
-            </div>
-
-            {/* Phone Number */}
-            <div>
-              <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-1">
-                Phone Number *
-              </label>
-              <input
-                id="phoneNumber"
-                name="phoneNumber"
-                type="tel"
-                required
-                pattern="[0-9]{10}"
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500 focus:z-10 sm:text-sm"
-                placeholder="10-digit phone number"
-                value={formData.phoneNumber}
-                onChange={handleChange}
-              />
-            </div>
-
-            {/* Department/Role */}
-            <div>
-              <label htmlFor="department" className="block text-sm font-medium text-gray-700 mb-1">
-                Department/Role *
-              </label>
-              <select
-                id="department"
-                name="department"
-                required
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500 focus:z-10 sm:text-sm"
-                value={formData.department}
-                onChange={handleChange}
-              >
-                <option value="">Select Department/Role</option>
-                {departments.map((dept) => (
-                  <option key={dept} value={dept}>{dept}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* College Code */}
-            <div>
-              <label htmlFor="collegeCode" className="block text-sm font-medium text-gray-700 mb-1">
-                College Registration/Code
-              </label>
-              <input
-                id="collegeCode"
-                name="collegeCode"
-                type="text"
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500 focus:z-10 sm:text-sm"
-                placeholder="College registration code (if available)"
-                value={formData.collegeCode}
-                onChange={handleChange}
-              />
-            </div>
-
-            {/* Password */}
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                Password *
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500 focus:z-10 sm:text-sm"
-                placeholder="Create a strong password"
-                value={formData.password}
-                onChange={handleChange}
-              />
-              {passwordErrors.length > 0 && (
-                <div className="mt-2">
-                  {passwordErrors.map((error, index) => (
-                    <p key={index} className="text-xs text-red-600">• {error}</p>
-                  ))}
-                </div>
-              )}
-              <p className="mt-1 text-xs text-gray-500">
-                Min 8 chars, 1 uppercase, 1 number, 1 symbol
-              </p>
-            </div>
-
-            {/* Confirm Password */}
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
-                Confirm Password *
-              </label>
-              <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                required
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500 focus:z-10 sm:text-sm"
-                placeholder="Confirm your password"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-              />
-              {formData.confirmPassword && formData.password !== formData.confirmPassword && (
-                <p className="mt-1 text-xs text-red-600">Passwords do not match</p>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <button
-              type="submit"
-              disabled={isLoading || passwordErrors.length > 0}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? (
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-              ) : (
-                <span className="absolute left-0 inset-y-0 flex items-center pl-3">
-                  <svg className="h-5 w-5 text-red-500 group-hover:text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                  </svg>
-                </span>
-              )}
-              {isLoading ? 'Creating Account...' : 'Create Admin Account'}
-            </button>
+    <div className="grid lg:grid-cols-5 gap-0 min-h-[80vh] rounded-3xl overflow-hidden shadow-xl">
+      {/* Left Side - Form (3 cols) */}
+      <div className="lg:col-span-3 flex flex-col items-center justify-center py-10 px-6 sm:px-12 bg-white">
+        <div className="max-w-xl w-full space-y-6">
+          {/* Mobile-only header */}
+          <div className="text-center lg:hidden">
+            <h1 className="text-3xl font-bold text-teal-800 mb-2">Admin Registration</h1>
           </div>
 
           <div className="text-center">
-            <p className="text-sm text-gray-600">
+            <h2 className="text-3xl font-bold text-[#2A3F47] mb-2">Admin Registration</h2>
+            <p className="text-gray-400">Create an administrative account for your institution</p>
+          </div>
+
+          <form className="space-y-4" onSubmit={handleSubmit}>
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                <div className="flex items-center">
+                  <div className="w-2 h-2 rounded-full bg-red-500 mr-3 flex-shrink-0"></div>
+                  <div>
+                    <p className="text-red-800 text-sm font-medium">Registration Failed</p>
+                    <p className="text-red-700 text-sm mt-1">{error}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label htmlFor="collegeName" className="block text-sm font-medium text-[#2A3F47] mb-2">College/Institution Name *</label>
+              <input id="collegeName" name="collegeName" type="text" required className={inputClass}
+                placeholder="Enter your college/institution name" value={formData.collegeName} onChange={handleChange} />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-[#2A3F47] mb-2">College Email ID *</label>
+                <input id="email" name="email" type="email" required className={inputClass}
+                  placeholder="admin@college.edu" value={formData.email} onChange={handleChange} />
+              </div>
+              <div>
+                <label htmlFor="phoneNumber" className="block text-sm font-medium text-[#2A3F47] mb-2">Phone Number *</label>
+                <input id="phoneNumber" name="phoneNumber" type="tel" required pattern="[0-9]{10}" className={inputClass}
+                  placeholder="10-digit phone number" value={formData.phoneNumber} onChange={handleChange} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="department" className="block text-sm font-medium text-[#2A3F47] mb-2">Department/Role *</label>
+                <select id="department" name="department" required className={inputClass} value={formData.department} onChange={handleChange}>
+                  <option value="">Select Department/Role</option>
+                  {departments.map((dept) => (<option key={dept} value={dept}>{dept}</option>))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="collegeCode" className="block text-sm font-medium text-[#2A3F47] mb-2">College Code</label>
+                <input id="collegeCode" name="collegeCode" type="text" className={inputClass}
+                  placeholder="Registration code (optional)" value={formData.collegeCode} onChange={handleChange} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-[#2A3F47] mb-2">Password *</label>
+                <input id="password" name="password" type="password" required className={inputClass}
+                  placeholder="Create a strong password" value={formData.password} onChange={handleChange} />
+                {passwordErrors.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {passwordErrors.map((err, index) => (
+                      <p key={index} className="text-xs text-red-600 flex items-center">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-400 mr-2 flex-shrink-0"></span>
+                        {err}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div>
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-[#2A3F47] mb-2">Confirm Password *</label>
+                <input id="confirmPassword" name="confirmPassword" type="password" required className={inputClass}
+                  placeholder="Confirm your password" value={formData.confirmPassword} onChange={handleChange} />
+                {formData.confirmPassword && formData.password !== formData.confirmPassword && (
+                  <p className="mt-1 text-xs text-red-600">Passwords do not match</p>
+                )}
+              </div>
+            </div>
+
+            <button type="submit" disabled={isLoading || passwordErrors.length > 0}
+              className="w-full flex justify-center py-3.5 px-4 rounded-xl shadow-lg text-white bg-teal-800 hover:bg-teal-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold transform hover:scale-[1.02] hover:shadow-xl">
+              {isLoading ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                  Creating Account...
+                </>
+              ) : (
+                'Create Admin Account'
+              )}
+            </button>
+          </form>
+
+          <div className="text-center space-y-3">
+            <p className="text-gray-500 text-sm">
               Already have an admin account?{' '}
-              <Link
-                to="/admin/login"
-                className="font-medium text-red-600 hover:text-red-500"
-              >
-                Sign in here
-              </Link>
+              <Link to="/admin/login" className="text-teal-700 hover:text-teal-800 font-semibold transition-colors">Sign in here</Link>
             </p>
-            <Link
-              to="/register"
-              className="mt-2 inline-block font-medium text-blue-600 hover:text-blue-500 text-sm"
-            >
+            <Link to="/register" className="block text-sm text-[#2A3F47] hover:text-teal-800 font-medium transition-colors">
               ← Student Registration
             </Link>
           </div>
-        </form>
-
-        <div className="text-center text-xs text-gray-500">
-          <p>Administrative accounts require approval and verification.</p>
-          <p>All activities are logged and monitored for security purposes.</p>
         </div>
+      </div>
+
+      {/* Right Side - Illustration (2 cols) - mirrored from AdminLogin */}
+      <div
+        className="hidden lg:flex lg:col-span-2 flex-col items-center justify-center p-10 relative"
+        style={{ backgroundColor: '#F9E6D0' }}
+      >
+        <div className="text-center max-w-sm">
+          <h2 className="text-3xl font-bold text-teal-800 mb-4 leading-tight">
+            Set Up Your<br />Institution
+          </h2>
+          <p className="text-base text-[#2A3F47] leading-relaxed mb-8">
+            Register your institution to enable mental health support services for your students through the Mann-Mitra platform.
+          </p>
+        </div>
+        <img
+          src={image5}
+          alt="Institution setup illustration"
+          className="max-w-[240px] w-full h-auto object-contain"
+        />
       </div>
     </div>
   )

@@ -2,7 +2,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { FiUser, FiLogIn, FiMessageSquare, FiBookOpen, FiUsers, FiHelpCircle, FiGlobe } from 'react-icons/fi'
+import { FiUser, FiLogIn, FiMessageSquare, FiBookOpen, FiUsers, FiHelpCircle, FiGlobe, FiArrowRight } from 'react-icons/fi'
 import LanguageSwitcher from './common/LanguageSwitcher'
 import logoImage from '../assets/Mann-mitra.png'
 
@@ -45,40 +45,40 @@ const Header = () => {
   const isActivePath = (path) => location.pathname.startsWith(path)
 
   return (
-    <header className="bg-white shadow-lg border-b border-gray-200 sticky top-0 z-50">
+    <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-        <div className="flex items-center justify-between h-16">
+        <div className="flex items-center justify-between h-14 md:h-16">
 
           {/* Logo as Home Link */}
-          <Link to="/" className="flex items-center space-x-3 flex-shrink-0">
+          <Link to="/" className="flex items-center gap-2 flex-shrink-0">
             <img 
               src={logoImage} 
-              alt="Mann-Mitra Logo" 
-              className="h-32 w-auto cursor-pointer hover:opacity-80 transition-opacity"
+              alt="Mann-Mitra" 
+              className="h-20 md:h-22 w-auto object-contain cursor-pointer hover:opacity-90 transition-opacity"
             />
           </Link>
 
-          {/* Navbar links */}
-          <nav className="flex flex-1 items-center space-x-1 ml-6">
+          {/* Navbar links - centered */}
+          <nav className="hidden md:flex flex-1 items-center justify-center gap-1">
             {navItems.map((item) => (
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200
                   ${isActivePath(item.path)
-                    ? 'bg-teal-100 text-teal-700 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'}
+                    ? 'bg-teal-50 text-teal-700'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}
                   `}
               >
                 {item.icon}
-                <span className="hidden sm:inline">{item.label}</span>
+                <span>{item.label}</span>
               </Link>
             ))}
           </nav>
 
           {/* Right side – profile menu and toggler */}
-          <div className="flex items-center space-x-1">
+          <div className="flex items-center gap-2 flex-shrink-0">
 
             {isAuthenticated ? (
               <div className="relative">
@@ -117,13 +117,13 @@ const Header = () => {
                 )}
               </div>
             ) : (
-              <button
-                className="flex items-center px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition"
-                onClick={() => navigate('/login')}
+              <Link
+                to="/login"
+                className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition font-medium text-sm"
               >
-                <FiLogIn className="mr-2" />
                 <span>{t('auth.login')}</span>
-              </button>
+                <FiArrowRight className="w-4 h-4" />
+              </Link>
             )}
 
             <button

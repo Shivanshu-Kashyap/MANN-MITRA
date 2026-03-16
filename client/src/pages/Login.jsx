@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useTranslation } from 'react-i18next'
+import image1 from '../assets/illustration_1.png'
 
 const Login = () => {
   const { t } = useTranslation()
@@ -12,7 +13,6 @@ const Login = () => {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Redirect if already authenticated
   if (isAuthenticated) {
     return <Navigate to="/" replace />
   }
@@ -32,7 +32,6 @@ const Login = () => {
     try {
       const result = await login(formData)
       if (result.success) {
-        // Login successful, user will be redirected by the Navigate component
         console.log('Login successful')
       }
     } catch (error) {
@@ -46,7 +45,7 @@ const Login = () => {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-800 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading...</p>
         </div>
       </div>
@@ -54,30 +53,57 @@ const Login = () => {
   }
 
   return (
-    <div className="py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8 mx-auto">
-        <div className="text-center">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">
-            {t('auth.login')}
+    <div className="grid lg:grid-cols-2 gap-0 min-h-[75vh] rounded-3xl overflow-hidden shadow-xl">
+      {/* Left Side - Illustration */}
+      <div
+        className="hidden lg:flex flex-col items-center justify-center p-12 relative"
+        style={{ backgroundColor: '#F9E6D0' }}
+      >
+        <div className="text-center max-w-md">
+          <h2 className="text-4xl font-bold text-teal-800 mb-4 leading-tight">
+            Welcome Back to<br />Mann-Mitra
           </h2>
-          <p className="text-gray-600">
-            Sign in to your account to continue
+          <p className="text-lg text-[#2A3F47] leading-relaxed mb-10">
+            Your trusted companion for mental wellness. Sign in to access AI support, professional counsellors, and peer guidance.
           </p>
         </div>
+        <img
+          src={image1}
+          alt="Mental wellness illustration"
+          className="max-w-xs w-full h-auto object-contain"
+        />
+      </div>
 
-        <div className="bg-white rounded-2xl shadow-xl p-8">
+      {/* Right Side - Login Form */}
+      <div className="flex flex-col items-center justify-center py-12 px-6 sm:px-12 bg-white">
+        {/* Mobile-only header */}
+        <div className="text-center lg:hidden mb-6">
+          <h1 className="text-3xl font-bold text-teal-800 mb-2">Mann-Mitra</h1>
+          <p className="text-gray-400 text-sm">Your mental wellness companion</p>
+        </div>
+
+        <div className="max-w-md w-full space-y-8">
+          <div className="text-center">
+            <h2 className="text-3xl font-bold text-[#2A3F47] mb-2">
+              {t('auth.login')}
+            </h2>
+            <p className="text-gray-400">
+              Sign in to your account to continue
+            </p>
+          </div>
+
           <form className="space-y-6" onSubmit={handleSubmit}>
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <div className="flex">
-                  <div className="text-red-400 mr-3">⚠️</div>
-                  <div className="text-red-800 text-sm">{error}</div>
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                <div className="flex items-center">
+                  <div className="w-2 h-2 rounded-full bg-red-500 mr-3 flex-shrink-0"></div>
+                  <div className="text-red-700 text-sm">{error}</div>
                 </div>
               </div>
             )}
 
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-[#2A3F47] mb-2">
                 {t('auth.email')}
               </label>
               <input
@@ -87,13 +113,13 @@ const Login = () => {
                 required
                 value={formData.email}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-700 focus:border-transparent transition-all bg-gray-50 hover:bg-white"
                 placeholder="Enter your email"
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="password" className="block text-sm font-medium text-[#2A3F47] mb-2">
                 {t('auth.password')}
               </label>
               <input
@@ -103,7 +129,7 @@ const Login = () => {
                 required
                 value={formData.password}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-700 focus:border-transparent transition-all bg-gray-50 hover:bg-white"
                 placeholder="Enter your password"
               />
             </div>
@@ -114,15 +140,15 @@ const Login = () => {
                   id="remember-me"
                   name="remember-me"
                   type="checkbox"
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-teal-800 focus:ring-teal-700 border-gray-300 rounded"
                 />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
+                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-600">
                   Remember me
                 </label>
               </div>
 
               <div className="text-sm">
-                <Link to="/forgot-password" className="text-blue-600 hover:text-blue-500 font-medium">
+                <Link to="/forgot-password" className="text-teal-700 hover:text-teal-800 font-medium transition-colors">
                   {t('auth.forgotPassword')}
                 </Link>
               </div>
@@ -131,7 +157,7 @@ const Login = () => {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-medium"
+              className="w-full flex justify-center py-3.5 px-4 rounded-xl shadow-lg text-white bg-teal-800 hover:bg-teal-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold transform hover:scale-[1.02] hover:shadow-xl"
             >
               {isSubmitting ? (
                 <>
@@ -144,48 +170,44 @@ const Login = () => {
             </button>
           </form>
 
-          <div className="mt-6 text-center">
-            <p className="text-gray-600">
+          <div className="text-center">
+            <p className="text-gray-500">
               {t('auth.noAccount')}{' '}
-              <Link to="/register" className="text-blue-600 hover:text-blue-500 font-medium">
+              <Link to="/register" className="text-teal-700 hover:text-teal-800 font-semibold transition-colors">
                 {t('auth.signup')}
               </Link>
             </p>
           </div>
 
-          {/* Admin and Counsellor Login Links */}
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            <p className="text-center text-sm text-gray-500 mb-4">
+          {/* Staff Access Links */}
+          <div className="pt-6 border-t border-gray-100">
+            <p className="text-center text-sm text-gray-400 mb-4 uppercase tracking-wider font-medium">
               Staff Access
             </p>
-            <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-2">
+            <div className="flex flex-wrap justify-center items-center gap-x-6 gap-y-2">
               <Link
                 to="/admin/login"
-                className="text-sm text-red-600 hover:text-red-800 font-medium flex items-center space-x-1"
+                className="text-sm text-[#2A3F47] hover:text-teal-800 font-medium transition-colors"
               >
-                <span>🔒</span>
-                <span>Admin Login</span>
+                Admin Login
               </Link>
-              <span className="text-gray-300">|</span>
+              <span className="text-gray-200">|</span>
               <Link
                 to="/admin/signup"
-                className="text-sm text-red-500 hover:text-red-700 font-medium flex items-center space-x-1"
+                className="text-sm text-[#2A3F47] hover:text-teal-800 font-medium transition-colors"
               >
-                <span>📝</span>
-                <span>Admin Sign Up</span>
+                Admin Sign Up
               </Link>
-              <span className="text-gray-300">|</span>
+              <span className="text-gray-200">|</span>
               <Link
                 to="/counsellor/login"
-                className="text-sm text-green-600 hover:text-green-800 font-medium flex items-center space-x-1"
+                className="text-sm text-[#2A3F47] hover:text-teal-800 font-medium transition-colors"
               >
-                <span>🧑‍⚕️</span>
-                <span>Counsellor Login</span>
+                Counsellor Login
               </Link>
             </div>
           </div>
         </div>
-
       </div>
     </div>
   )

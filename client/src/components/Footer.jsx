@@ -1,120 +1,134 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 const Footer = () => {
   const { t } = useTranslation();
   const currentYear = new Date().getFullYear();
 
-  // Define the main background and text colors
-  const bgColor = 'bg-[#F9E6D0]'; // Light peach/sand color
-  const textColor = 'text-[#2A3F47]'; // Dark teal text for contrast
-  const linkColor = 'text-teal-700 hover:text-teal-900 transition-colors'; // Teal for links
-
   return (
-    // Main Footer: Light peach background with dark text
-    <footer className={`${bgColor} ${textColor} pt-16 border-t border-gray-300`}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        
-        {/* Footer Content Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 pb-12">
-          
-          {/* Section 1: About Mann-Mitra */}
-          <div className="lg:col-span-1">
-            <h3 className="text-2xl font-bold mb-4">
-              {t('footer.about.title', 'About Mann-Mitra')}
+    <footer className="bg-[#1A3438] text-white">
+      {/* Main Footer Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-12 lg:gap-8">
+
+          {/* Column 1: Brand & About */}
+          <div className="lg:col-span-4">
+            <h3 className="text-2xl font-bold text-white mb-4">
+              Mann-Mitra
             </h3>
-            <p className="text-sm leading-relaxed text-gray-700">
-              {t('footer.about.description', 'We provide comprehensive mental health screening and support services to help individuals get the care they need.')}
+            <p className="text-gray-300 text-sm leading-relaxed mb-6 max-w-xs">
+              {t('footer.about.description', 'A comprehensive digital mental health platform connecting students with AI support, professional counsellors, and peer guidance — confidentially and securely.')}
             </p>
-          </div>
-          
-          {/* Section 2: Quick Links */}
-          <div className="lg:col-span-1">
-            <h3 className="text-lg font-semibold mb-4">{t('footer.quickLinks.title', 'Quick Links')}</h3>
-            <ul className="space-y-2 text-sm text-gray-700">
-              <li><a href="/" className={linkColor}>{t('footer.quickLinks.home', 'Home')}</a></li>
-              <li><a href="/screening" className={linkColor}>{t('footer.quickLinks.screening', 'Screening')}</a></li>
-              <li><a href="/resources" className={linkColor}>{t('footer.quickLinks.resources', 'Resources')}</a></li>
-              <li><a href="/forum" className={linkColor}>{t('footer.quickLinks.forum', 'Forum')}</a></li>
-              <li><a href="/booking" className={linkColor}>{t('footer.quickLinks.booking', 'Book Appointment')}</a></li>
-            </ul>
-          </div>
-          
-          {/* Section 3: Crisis Emergency - Highly Visible/Contrasting */}
-          <div className="lg:col-span-2"> {/* Takes up more space on large screens */}
-            <h3 className="text-2xl font-bold text-red-700 mb-4">
-              {t('footer.emergency.title', '🚨 Crisis Emergency')}
-            </h3>
-            {/* The crisis box uses a dark, high-contrast background to ensure it stands out */}
-            <div className="bg-[#2A3F47] p-5 rounded-xl border-2 border-red-500 shadow-xl">
-              <p className="text-red-400 font-extrabold mb-3 uppercase tracking-wider">IMMEDIATE HELP AVAILABLE</p>
-              
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                
-                {/* Contact: Lifeline */}
-                <div>
-                  <p className="font-semibold text-white">National Suicide Prevention Lifeline</p>
-                  <p className="text-red-500 text-lg">📞 <a href="tel:988" className="hover:underline font-bold">988</a></p>
-                </div>
-                
-                {/* Contact: Crisis Text */}
-                <div>
-                  <p className="font-semibold text-white">Crisis Text Line</p>
-                  <p className="text-red-500 text-lg">📱 Text <strong>HOME</strong> to <a href="sms:741741" className="hover:underline font-bold">741741</a></p>
-                </div>
-                
-                {/* Contact: Emergency Services */}
-                <div>
-                  <p className="font-semibold text-white">Emergency Services</p>
-                  {/* Using blue for 911/emergency number for distinct look */}
-                  <p className="text-blue-400 text-lg">📞 <a href="tel:911" className="hover:underline font-bold">911</a></p> 
-                </div>
-                
-                {/* Contact: Crisis Email */}
-                <div>
-                  <p className="font-semibold text-white">Crisis Email Support</p>
-                  <p className="text-blue-400 text-lg">✉️ <a href="mailto:crisis@mann-mitra.edu" className="hover:underline">crisis@mann-mitra.edu</a></p>
-                </div>
-              </div>
-              
-              {/* Alert Disclaimer */}
-              <div className="mt-5 p-3 bg-yellow-600/30 border border-yellow-500 rounded-lg">
-                <p className="text-xs text-yellow-100 font-medium">
-                  If you're having thoughts of self-harm, please reach out immediately. You're not alone.
-                </p>
-              </div>
+            <div className="flex items-center gap-2">
+              <span className="w-8 h-1 rounded-full bg-teal-500"></span>
+              <span className="w-4 h-1 rounded-full bg-teal-700"></span>
+              <span className="w-2 h-1 rounded-full bg-teal-900"></span>
             </div>
           </div>
-          
-          {/* Section 4: Support */}
-          <div className="lg:col-span-1">
-            <h3 className="text-lg font-semibold mb-4">{t('footer.support.title', 'Support')}</h3>
-            <ul className="space-y-2 text-sm text-gray-700">
-              <li><a href="/about" className={linkColor}>{t('footer.support.about', 'About Us')}</a></li>
-              <li><a href="#privacy" className={linkColor}>{t('footer.support.privacy', 'Privacy Policy')}</a></li>
-              <li><a href="#terms" className={linkColor}>{t('footer.support.terms', 'Terms of Service')}</a></li>
-              <li><a href="#contact" className={linkColor}>{t('footer.support.contact', 'Contact Us')}</a></li>
+
+          {/* Column 2: Quick Links */}
+          <div className="lg:col-span-2">
+            <h4 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-5">
+              {t('footer.quickLinks.title', 'Quick Links')}
+            </h4>
+            <ul className="space-y-3">
+              {[
+                { label: t('footer.quickLinks.home', 'Home'), to: '/' },
+                { label: t('footer.quickLinks.screening', 'Screening'), to: '/screening' },
+                { label: t('footer.quickLinks.resources', 'Resources'), to: '/resources' },
+                { label: t('footer.quickLinks.forum', 'Peer Talk'), to: '/forum' },
+                { label: t('footer.quickLinks.booking', 'Book Appointment'), to: '/booking' },
+              ].map((link) => (
+                <li key={link.to}>
+                  <Link
+                    to={link.to}
+                    className="text-gray-300 hover:text-white text-sm transition-colors duration-200 hover:pl-1"
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
-          
-        </div>
-        
-        {/* Footer Bottom: Copyright and Disclaimer */}
-        <div className="py-6 border-t border-gray-300 text-center md:text-left">
-          <div className="md:flex md:justify-between md:items-center text-xs space-y-3 md:space-y-0">
-            <p className="text-gray-600">
-              &copy; {currentYear} {t('footer.copyright', 'Mental Health Support Platform. All rights reserved.')}
-            </p>
-            <div className="footer-disclaimer max-w-lg md:text-right md:ml-auto">
-              <p className="text-gray-500">
-                <small>
-                  {t('footer.disclaimer', 'This platform is not a substitute for professional medical advice. If you are in crisis, please contact emergency services immediately.')}
-                </small>
+
+          {/* Column 3: Support */}
+          <div className="lg:col-span-2">
+            <h4 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-5">
+              {t('footer.support.title', 'Support')}
+            </h4>
+            <ul className="space-y-3">
+              {[
+                { label: t('footer.support.about', 'About Us'), to: '/about' },
+                { label: t('footer.support.privacy', 'Privacy Policy'), to: '#privacy' },
+                { label: t('footer.support.terms', 'Terms of Service'), to: '#terms' },
+                { label: t('footer.support.contact', 'Contact Us'), to: '#contact' },
+              ].map((link) => (
+                <li key={link.to}>
+                  <Link
+                    to={link.to}
+                    className="text-gray-300 hover:text-white text-sm transition-colors duration-200 hover:pl-1"
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Column 4: Crisis Support */}
+          <div className="lg:col-span-4">
+            <h4 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-5">
+              Crisis Support
+            </h4>
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-4">
+              <p className="text-red-400 text-xs font-semibold uppercase tracking-wider">
+                Immediate Help Available
+              </p>
+
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-300 text-sm">Suicide Prevention Lifeline</span>
+                  <a href="tel:988" className="text-white font-bold text-sm hover:text-teal-300 transition-colors">988</a>
+                </div>
+                <div className="h-px bg-white/10"></div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-300 text-sm">Crisis Text Line</span>
+                  <span className="text-white font-bold text-sm">HOME → 741741</span>
+                </div>
+                <div className="h-px bg-white/10"></div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-300 text-sm">Emergency Services</span>
+                  <a href="tel:911" className="text-white font-bold text-sm hover:text-teal-300 transition-colors">911</a>
+                </div>
+                <div className="h-px bg-white/10"></div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-300 text-sm">Crisis Email</span>
+                  <a href="mailto:crisis@mann-mitra.edu" className="text-white font-bold text-sm hover:text-teal-300 transition-colors">crisis@mann-mitra.edu</a>
+                </div>
+              </div>
+
+              <p className="text-gray-400 text-xs leading-relaxed pt-2 border-t border-white/10">
+                If you are having thoughts of self-harm, please reach out immediately. You are not alone.
               </p>
             </div>
           </div>
+
         </div>
-        
+      </div>
+
+      {/* Footer Bottom Bar */}
+      <div className="border-t border-white/10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-gray-400">
+            <p>
+              &copy; {currentYear} Mann-Mitra &middot; {t('footer.copyright', 'Mental Health Support Platform. All rights reserved.')}
+            </p>
+            <p className="text-center md:text-right max-w-md">
+              {t('footer.disclaimer', 'This platform is not a substitute for professional medical advice. If you are in crisis, please contact emergency services immediately.')}
+            </p>
+          </div>
+        </div>
       </div>
     </footer>
   );

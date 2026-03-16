@@ -203,46 +203,66 @@ const featuresData = [
 
       {/* Solution Flow Section */}
       <section className="py-16 md:py-24">
-    {/* Header Section: Centered title and subtitle, with 'EXPLORE & LEARN' tag */}
+    {/* Header Section */}
     <div className="max-w-4xl mx-auto text-center mb-16">
-        <p className="text-sm font-semibold tracking-widest text-teal-700 uppercase mb-2">
+        <p className="text-sm font-semibold tracking-widest text-teal-700 uppercase mb-3">
             EXPLORE & LEARN
         </p>
-        <h2 className="text-4xl md:text-5xl font-extrabold text-[#2A3F47] mb-4 leading-tight">
+        <h2 className="text-4xl md:text-5xl font-extrabold text-[#2A3F47] mb-6 leading-tight">
             Resources for<br />Your Well-being
         </h2>
-        <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+        <p className="text-xl text-gray-500 max-w-2xl mx-auto leading-relaxed">
             Explore expert insights, self-care guides, and tools to support your mental health.
         </p>
     </div>
 
-    {/* Features Grid: 3 columns with light cards */}
+    {/* Features Grid: Premium cards with accent stripe */}
     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {featuresData.map((feature, index) => (
+        {featuresData.map((feature, index) => {
+            const accents = [
+              'bg-amber-400',
+              'bg-teal-500',
+              'bg-rose-400',
+              'bg-[#2A3F47]',
+              'bg-orange-400',
+              'bg-sky-500',
+            ]
+            return (
             <div
                 key={index}
-                className="bg-white rounded-3xl p-8 flex flex-col items-start shadow-xl transition-all duration-300 hover:shadow-2xl hover:scale-[1.01]"
+                className="group bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] hover:-translate-y-1 flex flex-col"
             >
-                {/* Feature Title */}
-                <h3 className="text-2xl font-bold text-[#2A3F47] mb-3">
-                    {feature.title}
-                </h3>
+                {/* Accent stripe top */}
+                <div className={`h-1.5 w-full ${accents[index % accents.length]}`}></div>
                 
-                {/* Feature Description */}
-                <p className="text-gray-600 mb-8 flex-grow">
-                    {feature.description}
-                </p>
-                
-                {/* Explore Button */}
-                <button
-                    // The button color is dynamically set from the data array
-                    className={`inline-flex items-center px-6 py-3 font-semibold rounded-xl text-white shadow-md transition-colors duration-200 w-full justify-center 
-                        ${feature.buttonColor}`}
-                >
-                    {feature.buttonText}
-                </button>
+                <div className="p-8 flex flex-col flex-1">
+                    {/* Step number */}
+                    <div className="flex items-center gap-3 mb-5">
+                        <span className={`w-9 h-9 rounded-lg ${accents[index % accents.length]} flex items-center justify-center text-white text-sm font-bold`}>
+                            {String(index + 1).padStart(2, '0')}
+                        </span>
+                        <h3 className="text-xl font-bold text-[#2A3F47]">
+                            {feature.title}
+                        </h3>
+                    </div>
+                    
+                    {/* Description */}
+                    <p className="text-gray-500 leading-relaxed flex-grow mb-6 text-sm">
+                        {feature.description}
+                    </p>
+                    
+                    {/* Explore Button */}
+                    <button
+                        className="inline-flex items-center justify-center px-6 py-3 font-semibold rounded-xl border-2 border-[#2A3F47] text-[#2A3F47] bg-transparent hover:bg-teal-800 hover:border-teal-800 hover:text-white shadow-sm transition-all duration-200 w-full group-hover:shadow-md"
+                    >
+                        {feature.buttonText}
+                        <svg className="w-4 h-4 ml-2 transition-transform duration-200 group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                </div>
             </div>
-        ))}
+        )})}
     </div>
 </section>
     </div>
