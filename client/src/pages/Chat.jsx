@@ -4,6 +4,13 @@ import { io } from 'socket.io-client'
 import { useApi } from '../utils/api'
 import CrisisModal from '../components/CrisisModal'
 
+const RISK_COLORS = {
+  low: { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-300', dot: 'bg-green-500' },
+  medium: { bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-300', dot: 'bg-yellow-500' },
+  high: { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-300', dot: 'bg-orange-500' },
+  critical: { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-300', dot: 'bg-red-500' },
+}
+
 const Chat = () => {
   const { t } = useTranslation()
   const [isVoiceMode, setIsVoiceMode] = useState(false)
@@ -18,7 +25,11 @@ const Chat = () => {
   const [isTyping, setIsTyping] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const [crisisModal, setCrisisModal] = useState({ isOpen: false, type: null })
-  const [isPlaying, setIsPlaying] = useState({}) // Track which audio is playing
+  const [isPlaying, setIsPlaying] = useState({})
+  const [riskLevel, setRiskLevel] = useState('low')
+  const [riskScore, setRiskScore] = useState(0)
+  const [counsellorRec, setCounsellorRec] = useState(null)
+  const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`)
   const messagesEndRef = useRef(null)
   const socketRef = useRef(null)
   const inputRef = useRef(null)
@@ -325,11 +336,29 @@ const Chat = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
+  const handleBuddyResponse = (data) => {
+    if (data.risk_level) {
+      setRiskLevel(data.risk_level)
+      setRiskScore(data.risk_score || 0)
+      setSeverityLevel(data.risk_level)
+    }
+    if (data.counsellor_recommendation?.recommended) {
+      setCounsellorRec(data.counsellor_recommendation)
+      if (data.risk_level === 'high' || data.risk_level === 'critical') {
+        setShowCounsellorSuggestion(true)
+      }
+    }
+    if (data.crisis_response?.is_crisis) {
+      setCrisisModal({ isOpen: true, type: 'immediate' })
+    }
+    if (data.suggested_actions?.includes('crisis_escalation')) {
+      setCrisisModal({ isOpen: true, type: 'escalation' })
+    }
+  }
+
   const sendMessage = async (messageText = null) => {
     const textToSend = messageText || inputMessage.trim()
     if (!textToSend || isSending) return
-
-    console.log('💬 Sending message:', textToSend, '| Voice Mode:', isVoiceMode)
 
     const userMessage = {
       id: Date.now(),
@@ -343,121 +372,107 @@ const Chat = () => {
     if (!messageText) setInputMessage('')
     setIsSending(true)
 
-    // Assess severity before sending
     const severity = assessSeverity(textToSend)
 
     try {
       let responseReceived = false
+      const buddyAgentUrl = import.meta.env.VITE_BUDDY_AGENT_URL || 'http://localhost:8000'
 
-      // Primary: Try buddy agent first (voice or text mode)
+      // Primary: Try RAG buddy agent (voice or text mode)
       if (isVoiceMode) {
-        console.log('🎤 Using buddy voice agent...')
         try {
-          const buddyAgentUrl = import.meta.env.VITE_BUDDY_AGENT_URL || 'http://localhost:8000'
           const voiceResponse = await fetch(`${buddyAgentUrl}/chat`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              text: textToSend,
-              session_id: `voice_session_${Date.now()}`,
+              message: textToSend,
+              session_id: sessionId,
               response_format: "json"
             })
           })
 
-          console.log('📡 Voice agent response status:', voiceResponse.status)
-
           if (voiceResponse.ok) {
             const voiceData = await voiceResponse.json()
-            console.log('✅ Voice agent response:', voiceData)
             setBuddyAgentConnected(true)
+            handleBuddyResponse(voiceData)
             
             const botMessageId = Date.now() + 1
             const botMessage = {
               id: botMessageId,
-              text: voiceData.text,
+              text: voiceData.reply || voiceData.text,
               sender: 'bot',
               timestamp: new Date(),
               isVoice: true,
-              audioBase64: voiceData.audio_base64
+              audioBase64: voiceData.audio_base64,
+              riskLevel: voiceData.risk_level,
+              copingExercise: voiceData.coping_exercise,
+              counsellorRec: voiceData.counsellor_recommendation,
+              suggestedActions: voiceData.suggested_actions || []
             }
             setMessages(prev => [...prev, botMessage])
             responseReceived = true
 
-            // Play audio if available
             if (voiceData.audio_base64) {
               try {
-                console.log('🔊 Playing audio response...')
                 const audioBlob = new Blob(
                   [Uint8Array.from(atob(voiceData.audio_base64), c => c.charCodeAt(0))], 
                   { type: 'audio/mp3' }
                 )
                 const audioUrl = URL.createObjectURL(audioBlob)
                 const audio = new Audio(audioUrl)
-                
                 setIsPlaying(prev => ({ ...prev, [botMessageId]: true }))
-                
-                audio.play().catch(err => {
-                  console.error('❌ Audio playback error:', err)
-                })
-                
+                audio.play().catch(() => {})
                 audio.onended = () => {
                   URL.revokeObjectURL(audioUrl)
                   setIsPlaying(prev => ({ ...prev, [botMessageId]: false }))
                 }
               } catch (audioError) {
-                console.error('❌ Audio processing error:', audioError)
+                console.error('Audio processing error:', audioError)
               }
             }
-          } else {
-            const errorText = await voiceResponse.text()
-            console.error('❌ Voice agent error:', voiceResponse.status, errorText)
           }
         } catch (voiceError) {
-          console.error('❌ Voice agent request failed:', voiceError)
+          console.error('Voice agent request failed:', voiceError)
           setBuddyAgentConnected(false)
         }
       } else {
-        console.log('📝 Using buddy text agent...')
         try {
-          const buddyAgentUrl = import.meta.env.VITE_BUDDY_AGENT_URL || 'http://localhost:8000'
           const textResponse = await fetch(`${buddyAgentUrl}/chat/text`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              text: textToSend,
-              session_id: `text_session_${Date.now()}`
+              message: textToSend,
+              session_id: sessionId
             })
           })
 
-          console.log('📡 Text agent response status:', textResponse.status)
-
           if (textResponse.ok) {
             const textData = await textResponse.json()
-            console.log('✅ Text agent response:', textData)
             setBuddyAgentConnected(true)
+            handleBuddyResponse(textData)
             
             const botMessage = {
               id: Date.now() + 1,
               text: textData.text,
               sender: 'bot',
               timestamp: new Date(),
-              isVoice: false
+              isVoice: false,
+              riskLevel: textData.risk_level,
+              copingExercise: textData.coping_exercise,
+              counsellorRec: textData.counsellor_recommendation,
+              suggestedActions: textData.suggested_actions || []
             }
             setMessages(prev => [...prev, botMessage])
             responseReceived = true
-          } else {
-            const errorText = await textResponse.text()
-            console.error('❌ Text agent error:', textResponse.status, errorText)
           }
         } catch (textError) {
-          console.error('❌ Text agent request failed:', textError)
+          console.error('Text agent request failed:', textError)
           setBuddyAgentConnected(false)
         }
       }
 
-      // Fallback: Try original server API if buddy agent fails
+      // Fallback: Try original server API
       if (!responseReceived) {
-        console.log('🔄 Falling back to original server API...')
         try {
           const apiPromise = post('/v1/chat/message', {
             message: textToSend,
@@ -465,9 +480,7 @@ const Chat = () => {
             timestamp: new Date().toISOString()
           })
 
-          // Emit socket event for real-time response
           if (socketRef.current?.connected) {
-            console.log('📡 Emitting socket message...')
             socketRef.current.emit('user_message', {
               message: textToSend,
               severity: severity,
@@ -475,9 +488,7 @@ const Chat = () => {
             })
           }
 
-          // Wait for API response
           const response = await apiPromise
-          console.log('✅ Fallback API response:', response)
           
           if (response?.data?.message) {
             const botMessage = {
@@ -488,29 +499,25 @@ const Chat = () => {
               suggestedActions: response.data.suggestedActions || []
             }
             setMessages(prev => [...prev, botMessage])
-
-            // Handle crisis escalation from API response
             if (response.data.suggestedActions?.includes('crisis_escalation')) {
               setCrisisModal({ isOpen: true, type: 'escalation' })
             }
             responseReceived = true
           }
         } catch (serverError) {
-          console.error('❌ Fallback API error:', serverError)
+          console.error('Fallback API error:', serverError)
         }
       }
 
-      // Final fallback: Show error if nothing worked
       if (!responseReceived) {
-        console.warn('⚠️ No response received from any service')
         throw new Error('All services unavailable')
       }
 
     } catch (error) {
-      console.error('❌ General error in sendMessage:', error)
+      console.error('Error in sendMessage:', error)
       const errorMessage = {
         id: Date.now() + 2,
-        text: 'Sorry, I\'m having trouble responding right now. Please check the console for details and try again.',
+        text: 'Sorry, I\'m having trouble responding right now. Please try again or reach out to a crisis line if you need immediate help (988).',
         sender: 'system',
         timestamp: new Date(),
         isError: true
@@ -838,22 +845,99 @@ const Chat = () => {
               </div>
             )}
 
+            {/* Coping Exercise Card */}
+            {message.copingExercise && (
+              <div className="mt-3 p-3 bg-teal-50 border border-teal-200 rounded-xl">
+                <div className="flex items-center mb-2">
+                  <span className="text-teal-600 mr-2">🧘</span>
+                  <span className="font-semibold text-teal-800 text-sm">{message.copingExercise.title}</span>
+                  {message.copingExercise.duration && (
+                    <span className="ml-auto text-xs text-teal-600 bg-teal-100 px-2 py-0.5 rounded">{message.copingExercise.duration}</span>
+                  )}
+                </div>
+                {message.copingExercise.instructions && (
+                  <ol className="text-xs text-teal-700 space-y-1 ml-5 list-decimal">
+                    {message.copingExercise.instructions.map((step, i) => (
+                      <li key={i}>{step}</li>
+                    ))}
+                  </ol>
+                )}
+              </div>
+            )}
+
+            {/* Inline Counsellor Recommendation */}
+            {message.counsellorRec?.recommended && (
+              <div className={`mt-3 p-3 rounded-xl border ${
+                message.counsellorRec.urgency === 'immediate' ? 'bg-red-50 border-red-200' :
+                message.counsellorRec.urgency === 'high' ? 'bg-orange-50 border-orange-200' :
+                'bg-blue-50 border-blue-200'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <span className="mr-2">{message.counsellorRec.urgency === 'immediate' ? '🚨' : '💬'}</span>
+                    <span className={`text-xs font-medium ${
+                      message.counsellorRec.urgency === 'immediate' ? 'text-red-700' : 'text-blue-700'
+                    }`}>
+                      {message.counsellorRec.message}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => handleSuggestedAction('book_counsellor')}
+                    className={`ml-2 px-3 py-1 text-xs rounded-full font-medium text-white ${
+                      message.counsellorRec.urgency === 'immediate' ? 'bg-red-600 hover:bg-red-700' : 'bg-teal-600 hover:bg-teal-700'
+                    }`}
+                  >
+                    Book Now
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Suggested Actions */}
             {message.suggestedActions && message.suggestedActions.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-2">
-                {message.suggestedActions.map((action, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleSuggestedAction(action)}
-                    className={`px-3 py-1 text-xs rounded-full border transition-colors ${
-                      action === 'crisis_escalation'
-                        ? 'bg-red-100 text-red-700 border-red-200 hover:bg-red-200'
-                        : 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200'
-                    }`}
-                  >
-                    {t(`chat.actions.${action}`)}
-                  </button>
-                ))}
+                {message.suggestedActions.map((action, index) => {
+                  const actionLabels = {
+                    crisis_escalation: 'Get Emergency Help',
+                    emergency_contact: 'Call 911',
+                    immediate_help: 'Crisis Line: 988',
+                    contact_counsellor: 'Contact Counsellor',
+                    book_counsellor: 'Book Session',
+                    crisis_resources: 'Crisis Resources',
+                    breathing_exercise: 'Breathing Exercise',
+                    seek_counseling: 'Talk to Professional',
+                    optional_counselling: 'Consider Counselling',
+                    coping_strategies: 'Coping Strategies',
+                    journaling: 'Try Journaling',
+                    self_help_resources: 'Self-Help Resources',
+                    mindfulness: 'Mindfulness',
+                  }
+                  return (
+                    <button
+                      key={index}
+                      onClick={() => handleSuggestedAction(action)}
+                      className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                        action === 'crisis_escalation' || action === 'emergency_contact' || action === 'immediate_help'
+                          ? 'bg-red-100 text-red-700 border-red-200 hover:bg-red-200'
+                          : action === 'book_counsellor' || action === 'contact_counsellor' || action === 'seek_counseling'
+                          ? 'bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-200'
+                          : 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200'
+                      }`}
+                    >
+                      {actionLabels[action] || action.replace(/_/g, ' ')}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Risk Level Indicator (for bot messages with elevated risk) */}
+            {isBot && message.riskLevel && message.riskLevel !== 'low' && (
+              <div className={`mt-2 inline-flex items-center px-2 py-0.5 rounded text-xs ${RISK_COLORS[message.riskLevel]?.bg} ${RISK_COLORS[message.riskLevel]?.text}`}>
+                <span className={`w-1.5 h-1.5 rounded-full mr-1 ${RISK_COLORS[message.riskLevel]?.dot}`} />
+                {message.riskLevel === 'critical' ? 'Immediate support recommended' :
+                 message.riskLevel === 'high' ? 'Professional help recommended' :
+                 'Counselling available'}
               </div>
             )}
 
@@ -981,10 +1065,6 @@ const Chat = () => {
                 Buddy - Your Mental Health Companion
               </h1>
               <div className="flex items-center text-sm text-gray-500">
-                {/* <div className={`w-2 h-2 rounded-full mr-2 ${
-                  isConnected ? 'bg-green-400' : 'bg-red-400'
-                }`} /> */}
-                {/* Server: {isConnected ? 'Online' : 'Offline'} •  */}
                 <div className={`w-2 h-2 rounded-full mx-2 ${
                   buddyAgentConnected === true ? 'bg-green-400' : 
                   buddyAgentConnected === false ? 'bg-red-400' : 'bg-yellow-400'
@@ -992,7 +1072,13 @@ const Chat = () => {
                 Buddy: {
                   buddyAgentConnected === true ? 'Online' : 
                   buddyAgentConnected === false ? 'Offline' : 'Checking...'
-                } {severityLevel && ` • Severity: ${severityLevel}`}
+                }
+                {riskLevel !== 'low' && (
+                  <span className={`ml-3 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${RISK_COLORS[riskLevel]?.bg} ${RISK_COLORS[riskLevel]?.text}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full mr-1 ${RISK_COLORS[riskLevel]?.dot}`} />
+                    Risk: {riskLevel} ({riskScore}/100)
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -1009,26 +1095,43 @@ const Chat = () => {
               {isVoiceMode ? '🎤 Voice Mode' : '💬 Text Mode'}
             </button>
             <div className="text-sm text-gray-500">
-              AI/Voice Support • Regional Languages
+              RAG-Powered Support
             </div>
           </div>
         </div>
 
-        {/* Severity Warning */}
-        {showCounsellorSuggestion && (
-          <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+        {/* Counsellor Recommendation Banner */}
+        {showCounsellorSuggestion && counsellorRec && (
+          <div className={`mt-3 p-3 rounded-lg border ${
+            riskLevel === 'critical' ? 'bg-red-50 border-red-300' :
+            riskLevel === 'high' ? 'bg-orange-50 border-orange-300' :
+            'bg-yellow-50 border-yellow-300'
+          }`}>
             <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <span className="text-orange-600 mr-2">⚠️</span>
-                <span className="text-orange-800 font-medium">
-                  I notice you might be going through a tough time. Would you like to connect with a professional counsellor?
+              <div className="flex items-center flex-1">
+                <span className={`mr-2 text-lg ${riskLevel === 'critical' ? '' : ''}`}>
+                  {riskLevel === 'critical' ? '🚨' : '⚠️'}
                 </span>
+                <div>
+                  <span className={`font-semibold ${
+                    riskLevel === 'critical' ? 'text-red-800' : 'text-orange-800'
+                  }`}>
+                    {counsellorRec.message || 'Would you like to connect with a professional counsellor?'}
+                  </span>
+                  {counsellorRec.session_type && (
+                    <span className="ml-2 text-xs px-2 py-0.5 rounded bg-white/50">
+                      Recommended: {counsellorRec.session_type} session
+                    </span>
+                  )}
+                </div>
               </div>
               <button
                 onClick={() => handleSuggestedAction('book_counsellor')}
-                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+                className={`ml-4 px-4 py-2 text-white rounded-lg transition-colors font-medium ${
+                  riskLevel === 'critical' ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-600 hover:bg-orange-700'
+                }`}
               >
-                Book Counsellor
+                {counsellorRec.urgency === 'immediate' ? 'Get Help Now' : 'Book Counsellor'}
               </button>
             </div>
           </div>
@@ -1095,7 +1198,7 @@ const Chat = () => {
                 className="w-full px-4 py-3 border border-gray-300 rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                 rows="1"
                 style={{ maxHeight: '120px' }}
-                disabled={!isConnected || (isVoiceMode && !inputMessage)}
+                disabled={isVoiceMode && !inputMessage}
                 aria-label="Type your message"
               />
             </div>
@@ -1127,9 +1230,9 @@ const Chat = () => {
 
             <button
               onClick={sendMessage}
-              disabled={!inputMessage.trim() || isSending || !isConnected}
+              disabled={!inputMessage.trim() || isSending}
               className={`p-3 rounded-full transition-all duration-200 ${
-                inputMessage.trim() && !isSending && isConnected
+                inputMessage.trim() && !isSending
                   ? 'bg-teal-800 text-white hover:bg-teal-900 shadow-lg hover:shadow-xl transform hover:scale-105'
                   : 'bg-gray-200 text-gray-400 cursor-not-allowed'
               }`}
@@ -1145,9 +1248,9 @@ const Chat = () => {
             </button>
           </div>
           
-          {!isConnected && (
+          {!isConnected && !buddyAgentConnected && (
             <div className="mt-2 text-center text-sm text-red-600">
-              {t('chat.connectionLost')}
+              Services are offline. Please try again later.
             </div>
           )}
         </div>

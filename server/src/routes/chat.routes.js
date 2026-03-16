@@ -469,4 +469,56 @@ router.get(
   }
 );
 
+// @route   POST /api/v1/chat/buddy-alert
+// @desc    Receive risk alerts from Buddy RAG service and broadcast via Socket.io
+// @access  Internal (called by Buddy Python service)
+router.post(
+  '/buddy-alert',
+  [
+    body('alertId').isString().notEmpty(),
+    body('riskLevel').isIn(['low', 'medium', 'high', 'critical']),
+    body('riskScore').isInt({ min: 0, max: 100 }),
+    body('riskSummary').isString().notEmpty(),
+    body('sessionId').isString().notEmpty(),
+  ],
+  async (req, res) => {
+    try {
+      const { alertId, userId, anonymousId, riskLevel, riskScore, riskSummary, source, sessionId, timestamp } = req.body;
+
+      const socketService = require('../services/socket.service');
+      const alertData = {
+        userId: userId || null,
+        userName: anonymousId || 'Anonymous Chat User',
+        anonymousDisplayName: anonymousId || 'Anonymous Chat User',
+        source: source || 'buddy_rag',
+        message: riskSummary,
+        data: {
+          alertId,
+          sessionId,
+          riskLevel,
+          riskScore,
+          source: 'buddy_rag',
+          timestamp: timestamp || new Date().toISOString(),
+        }
+      };
+
+      socketService.emitCrisisAlert(alertData);
+
+      console.log(`[BuddyAlert] Crisis alert received and broadcast: ${alertId} (${riskLevel}, score: ${riskScore})`);
+
+      res.status(200).json({
+        success: true,
+        message: 'Alert broadcast to counsellors and admins',
+        alertId,
+      });
+    } catch (error) {
+      console.error('Buddy alert error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to broadcast alert',
+      });
+    }
+  }
+);
+
 module.exports = router;

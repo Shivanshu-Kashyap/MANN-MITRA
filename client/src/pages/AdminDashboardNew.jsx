@@ -139,6 +139,7 @@ const AdminDashboardNew = () => {
 
   const tabs = [
     { id: 'overview', name: 'Overview' },
+    { id: 'risk-dashboard', name: 'Risk Dashboard' },
     { id: 'counsellors', name: 'Counsellors' },
     { id: 'peer-approval', name: 'Peer Approval' },
     { id: 'students', name: 'Student Analytics' },
@@ -254,6 +255,7 @@ const AdminDashboardNew = () => {
       {/* Tab Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === 'overview' && <OverviewTab data={dashboardData} />}
+        {activeTab === 'risk-dashboard' && <RiskDashboardTab />}
         {activeTab === 'counsellors' && (
           <CounsellorManagementTab 
             counsellors={counsellors} 
@@ -267,6 +269,148 @@ const AdminDashboardNew = () => {
         {activeTab === 'crisis' && <CrisisManagementTab />}
         {activeTab === 'reports' && <ReportsTab />}
         {activeTab === 'courses' && <CourseManagementTab />}
+      </div>
+    </div>
+  )
+}
+
+// Risk Dashboard Tab - Real-time risk monitoring from Buddy RAG service
+const RiskDashboardTab = () => {
+  const [dashboardData, setDashboardData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    fetchRiskDashboard()
+    const interval = setInterval(fetchRiskDashboard, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const fetchRiskDashboard = async () => {
+    try {
+      const buddyUrl = import.meta.env.VITE_BUDDY_AGENT_URL || 'http://localhost:8000'
+      const response = await fetch(`${buddyUrl}/admin/risk-dashboard`)
+      if (response.ok) {
+        const data = await response.json()
+        setDashboardData(data)
+        setError(null)
+      } else {
+        setError('Failed to fetch risk dashboard')
+      }
+    } catch (err) {
+      setError('Buddy RAG service is not reachable')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const riskColors = {
+    low: { bg: 'bg-green-100', text: 'text-green-800', bar: 'bg-green-500' },
+    medium: { bg: 'bg-yellow-100', text: 'text-yellow-800', bar: 'bg-yellow-500' },
+    high: { bg: 'bg-orange-100', text: 'text-orange-800', bar: 'bg-orange-500' },
+    critical: { bg: 'bg-red-100', text: 'text-red-800', bar: 'bg-red-500' },
+  }
+
+  if (loading) return <div className="text-center py-12"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-800 mx-auto"></div><p className="mt-4 text-gray-500">Loading risk data...</p></div>
+  if (error) return <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center"><p className="text-red-700 font-medium">{error}</p><button onClick={fetchRiskDashboard} className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Retry</button></div>
+
+  const dist = dashboardData?.severity_distribution || {}
+  const totalSessions = Object.values(dist).reduce((sum, d) => sum + (d.count || 0), 0) || 1
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900">Risk Monitoring Dashboard</h2>
+        <button onClick={fetchRiskDashboard} className="px-4 py-2 bg-teal-800 text-white rounded-lg hover:bg-teal-900 text-sm">Refresh</button>
+      </div>
+
+      {/* Severity Distribution Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {['critical', 'high', 'medium', 'low'].map(level => {
+          const d = dist[level] || { count: 0, avg_score: 0 }
+          const colors = riskColors[level]
+          return (
+            <div key={level} className={`${colors.bg} rounded-xl p-5 border`}>
+              <div className="flex items-center justify-between">
+                <span className={`text-sm font-semibold uppercase ${colors.text}`}>{level}</span>
+                <span className={`text-3xl font-bold ${colors.text}`}>{d.count}</span>
+              </div>
+              <p className={`text-xs mt-1 ${colors.text} opacity-70`}>Avg Score: {d.avg_score || 0}/100</p>
+              <div className="mt-2 w-full bg-white/50 rounded-full h-2">
+                <div className={`${colors.bar} h-2 rounded-full`} style={{ width: `${Math.min((d.count / totalSessions) * 100, 100)}%` }}></div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* High Risk Active Cases */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+          <h3 className="font-semibold text-gray-900">High-Risk Active Cases</h3>
+          <p className="text-sm text-gray-500">Sessions flagged as high or critical risk (anonymized)</p>
+        </div>
+        <div className="divide-y divide-gray-100">
+          {(!dashboardData?.high_risk_cases || dashboardData.high_risk_cases.length === 0) ? (
+            <div className="px-6 py-8 text-center text-gray-400">No high-risk cases at this time</div>
+          ) : (
+            dashboardData.high_risk_cases.map((c, i) => (
+              <div key={i} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50">
+                <div className="flex items-center space-x-4">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white ${c.risk_level === 'critical' ? 'bg-red-500' : 'bg-orange-500'}`}>
+                    {c.risk_score}
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">{c.anonymous_id}</p>
+                    <p className="text-sm text-gray-500 max-w-md truncate">{c.risk_summary}</p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${riskColors[c.risk_level]?.bg} ${riskColors[c.risk_level]?.text}`}>
+                    {c.risk_level}
+                  </span>
+                  <span className="text-xs text-gray-400">{c.interaction_count} msgs</span>
+                  {c.mood_trend && c.mood_trend.length > 1 && (
+                    <div className="flex items-end space-x-0.5 h-6">
+                      {c.mood_trend.slice(-8).map((s, j) => (
+                        <div key={j} className={`w-1.5 rounded-t ${s > 60 ? 'bg-red-400' : s > 30 ? 'bg-yellow-400' : 'bg-green-400'}`} style={{ height: `${Math.max(s / 100 * 24, 2)}px` }}></div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Recent Alerts */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+          <h3 className="font-semibold text-gray-900">Recent Risk Alerts</h3>
+        </div>
+        <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
+          {(!dashboardData?.recent_alerts || dashboardData.recent_alerts.length === 0) ? (
+            <div className="px-6 py-8 text-center text-gray-400">No recent alerts</div>
+          ) : (
+            dashboardData.recent_alerts.map((a, i) => (
+              <div key={i} className="px-6 py-3 flex items-center justify-between hover:bg-gray-50">
+                <div className="flex items-center space-x-3">
+                  <span className={`w-2 h-2 rounded-full ${riskColors[a.risk_level]?.bar}`}></span>
+                  <span className="text-sm text-gray-700 max-w-lg truncate">{a.risk_summary}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className={`px-2 py-0.5 rounded text-xs ${riskColors[a.risk_level]?.bg} ${riskColors[a.risk_level]?.text}`}>
+                    {a.risk_score}/100
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    {a.created_at ? new Date(a.created_at).toLocaleString() : ''}
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
   )
