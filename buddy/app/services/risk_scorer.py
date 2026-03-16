@@ -38,13 +38,24 @@ class RiskScorer:
         # Scale 0-1 float -> 0-100 int
         score = int(min(round(raw * 100), 100))
 
-        # Hard override: if critical keywords are present, floor the score at 81
-        has_critical = any(
-            kw in (" ".join(indicators.keyword_flags))
-            for kw in ("suicide", "suicidal", "kill", "die", "dead", "end my life", "overdose")
-        )
+        # Hard override: if ANY critical-level keyword was flagged, floor the score
+        _CRITICAL_OVERRIDE_TOKENS = {
+            "suicide", "suicidal", "sucidal", "sucidial", "sucidle", "suicde",
+            "kill", "die", "dead", "end my life", "overdose", "unalive",
+            "kms", "kys", "ctb",
+            "marna", "mar jana", "mar jaana", "jaan de", "khudkushi",
+            "aatmhatya", "atmahatya", "kud ja", "kood ja", "zinda nahi",
+            "maut", "fansi", "phansi",
+        }
+        joined_flags = " ".join(indicators.keyword_flags).lower()
+        has_critical = any(tok in joined_flags for tok in _CRITICAL_OVERRIDE_TOKENS)
+
         if has_critical and score < settings.RISK_THRESHOLD_CRITICAL:
             score = settings.RISK_THRESHOLD_CRITICAL
+
+        # If suicidal ideation score is very high, ensure at least HIGH
+        if indicators.suicidal_ideation_score >= 0.7 and score < settings.RISK_THRESHOLD_HIGH:
+            score = settings.RISK_THRESHOLD_HIGH
 
         level = self._classify(score)
         explanation = self._explain(indicators, score, level)

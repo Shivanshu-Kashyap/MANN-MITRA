@@ -1,9 +1,9 @@
-import { useTranslation } from 'react-i18next'
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 const CrisisModal = ({ isOpen, onClose, crisisType, onContactCounselor }) => {
-  const { t } = useTranslation()
   const [isContactingCounselor, setIsContactingCounselor] = useState(false)
+  const navigate = useNavigate()
 
   if (!isOpen) return null
 
@@ -18,192 +18,157 @@ const CrisisModal = ({ isOpen, onClose, crisisType, onContactCounselor }) => {
     }
   }
 
-  const emergencyContacts = [
-    {
-      name: t('crisis.contacts.suicidePrevention'),
-      number: '988',
-      description: t('crisis.contacts.suicidePreventionDesc'),
-      urgent: true
-    },
-    {
-      name: t('crisis.contacts.crisisText'),
-      number: 'Text HOME to 741741',
-      description: t('crisis.contacts.crisisTextDesc'),
-      urgent: true
-    },
-    {
-      name: t('crisis.contacts.emergency'),
-      number: '911',
-      description: t('crisis.contacts.emergencyDesc'),
-      urgent: true
-    },
-    {
-      name: t('crisis.contacts.mentalHealthHotline'),
-      number: '1-800-662-4357',
-      description: t('crisis.contacts.mentalHealthHotlineDesc'),
-      urgent: false
-    }
-  ]
+  const isImmediate = crisisType === 'immediate'
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black bg-opacity-75 transition-opacity" />
-      
-      {/* Modal */}
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+
       <div className="flex items-center justify-center min-h-screen p-4">
-        <div className="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 overflow-hidden">
+        <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden animate-in fade-in zoom-in">
+
           {/* Header */}
-          <div className="bg-gradient-to-r from-red-600 to-pink-600 p-6 text-white">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="flex-shrink-0">
-                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 15.5c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold">
-                    {crisisType === 'immediate' ? t('crisis.immediate.title') : t('crisis.escalation.title')}
-                  </h2>
-                  <p className="text-red-100">
-                    {crisisType === 'immediate' ? t('crisis.immediate.subtitle') : t('crisis.escalation.subtitle')}
-                  </p>
-                </div>
+          <div className={`px-6 py-5 text-white ${
+            isImmediate
+              ? 'bg-gradient-to-br from-red-600 to-rose-700'
+              : 'bg-gradient-to-br from-amber-500 to-orange-600'
+          }`}>
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">We're Here For You</h2>
+                <p className="text-white/80 text-sm mt-0.5">
+                  {isImmediate
+                    ? "We've noticed you may be going through a tough time"
+                    : 'It looks like you could use some extra support'}
+                </p>
               </div>
             </div>
           </div>
 
-          {/* Content */}
-          <div className="p-6">
-            {/* Important Message */}
-            <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-red-800 font-medium">
-                    {crisisType === 'immediate' 
-                      ? t('crisis.immediate.message')
-                      : t('crisis.escalation.message')
-                    }
-                  </p>
-                </div>
-              </div>
-            </div>
+          {/* Body */}
+          <div className="p-6 space-y-4">
 
-            {/* Emergency Contact Counselor Button */}
-            <div className="mb-8">
-              <button
-                onClick={handleContactCounselor}
-                disabled={isContactingCounselor}
-                className="w-full bg-gradient-to-r from-red-600 to-pink-600 text-white text-xl font-bold py-6 px-8 rounded-xl hover:from-red-700 hover:to-pink-700 transform hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                aria-label={t('crisis.contactCounselor')}
-              >
-                {isContactingCounselor ? (
-                  <>
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mx-auto mb-2"></div>
-                    {t('crisis.contactingCounselor')}
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                    </svg>
-                    {t('crisis.contactCounselor')}
-                  </>
-                )}
-              </button>
-              <p className="text-center text-gray-600 text-sm mt-2">
-                {t('crisis.contactCounselorDesc')}
+            {/* Supportive message */}
+            <div className={`rounded-xl p-4 ${
+              isImmediate ? 'bg-red-50 border border-red-100' : 'bg-amber-50 border border-amber-100'
+            }`}>
+              <p className={`text-sm leading-relaxed ${
+                isImmediate ? 'text-red-800' : 'text-amber-800'
+              }`}>
+                {isImmediate
+                  ? "Your feelings are valid and you matter. Please know you don't have to face this alone — professional support can make a real difference."
+                  : "It's okay to ask for help. Talking to a counselor can provide you with personalized strategies and support."}
               </p>
             </div>
 
-            {/* Emergency Contacts */}
-            <div className="space-y-4 mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                {t('crisis.emergencyContacts')}
-              </h3>
-              
-              {emergencyContacts.map((contact, index) => (
-                <div
-                  key={index}
-                  className={`border rounded-lg p-4 ${
-                    contact.urgent 
-                      ? 'border-red-200 bg-red-50' 
-                      : 'border-gray-200 bg-gray-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <h4 className={`font-medium ${
-                        contact.urgent ? 'text-red-900' : 'text-gray-900'
-                      }`}>
-                        {contact.name}
-                      </h4>
-                      <p className={`text-sm ${
-                        contact.urgent ? 'text-red-700' : 'text-gray-600'
-                      }`}>
-                        {contact.description}
-                      </p>
-                    </div>
-                    <div className="flex-shrink-0 ml-4">
-                      <a
-                        href={`tel:${contact.number.replace(/\D/g, '')}`}
-                        className={`inline-flex items-center px-4 py-2 rounded-lg font-medium transition-colors ${
-                          contact.urgent
-                            ? 'bg-red-600 text-white hover:bg-red-700'
-                            : 'bg-blue-600 text-white hover:bg-blue-700'
-                        }`}
-                      >
-                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                        </svg>
-                        {contact.number}
-                      </a>
-                    </div>
-                  </div>
+            {/* Action Cards */}
+            <div className="space-y-3">
+
+              {/* Book Counseling */}
+              <button
+                onClick={() => { onClose(); navigate('/booking') }}
+                className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all duration-200 hover:shadow-md group ${
+                  isImmediate
+                    ? 'border-red-200 hover:border-red-400 hover:bg-red-50'
+                    : 'border-teal-200 hover:border-teal-400 hover:bg-teal-50'
+                }`}
+              >
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                  isImmediate
+                    ? 'bg-red-100 text-red-600 group-hover:bg-red-200'
+                    : 'bg-teal-100 text-teal-600 group-hover:bg-teal-200'
+                }`}>
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
                 </div>
-              ))}
+                <div className="text-left flex-1">
+                  <p className="font-semibold text-gray-900">Book a Counseling Session</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {isImmediate ? 'Priority slot available — talk to a professional' : 'Schedule a session with a trained counselor'}
+                  </p>
+                </div>
+                <svg className="w-5 h-5 text-gray-400 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+
+              {/* Talk to Counselor Now */}
+              <button
+                onClick={handleContactCounselor}
+                disabled={isContactingCounselor}
+                className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all duration-200 hover:shadow-md group ${
+                  isImmediate
+                    ? 'border-red-200 hover:border-red-400 hover:bg-red-50'
+                    : 'border-purple-200 hover:border-purple-400 hover:bg-purple-50'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                  isImmediate
+                    ? 'bg-red-100 text-red-600 group-hover:bg-red-200'
+                    : 'bg-purple-100 text-purple-600 group-hover:bg-purple-200'
+                }`}>
+                  {isContactingCounselor ? (
+                    <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                        d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
+                    </svg>
+                  )}
+                </div>
+                <div className="text-left flex-1">
+                  <p className="font-semibold text-gray-900">
+                    {isContactingCounselor ? 'Connecting...' : 'Talk to a Counselor Now'}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">Get connected to a live counselor via chat</p>
+                </div>
+                <svg className="w-5 h-5 text-gray-400 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+
+              {/* Browse Resources */}
+              <button
+                onClick={() => { onClose(); navigate('/resources') }}
+                className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-blue-200 hover:border-blue-400 hover:bg-blue-50 transition-all duration-200 hover:shadow-md group"
+              >
+                <div className="w-12 h-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0 group-hover:bg-blue-200">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                  </svg>
+                </div>
+                <div className="text-left flex-1">
+                  <p className="font-semibold text-gray-900">Browse Self-Help Resources</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Explore guided courses, articles & exercises</p>
+                </div>
+                <svg className="w-5 h-5 text-gray-400 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
             </div>
 
-            {/* Safety Resources */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-              <h4 className="font-medium text-blue-900 mb-2">
-                {t('crisis.safetyResources.title')}
-              </h4>
-              <ul className="text-blue-800 text-sm space-y-1">
-                <li>• {t('crisis.safetyResources.stayWith')}</li>
-                <li>• {t('crisis.safetyResources.removeHarmful')}</li>
-                <li>• {t('crisis.safetyResources.seekImmediate')}</li>
-                <li>• {t('crisis.safetyResources.followUp')}</li>
-              </ul>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={onClose}
-                className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-              >
-                {t('crisis.acknowledgeAndContinue')}
-              </button>
-              <button
-                onClick={() => window.location.href = '/resources'}
-                className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-              >
-                {t('crisis.viewMoreResources')}
-              </button>
-            </div>
+            {/* Continue Chat */}
+            <button
+              onClick={onClose}
+              className="w-full py-3 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-xl transition-colors"
+            >
+              Continue chatting with Buddy
+            </button>
           </div>
 
           {/* Footer */}
-          <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
-            <p className="text-center text-gray-600 text-xs">
-              {t('crisis.disclaimer')}
+          <div className="bg-gray-50 px-6 py-3 border-t border-gray-100">
+            <p className="text-center text-gray-400 text-xs">
+              Buddy is an AI assistant, not a licensed therapist. For emergencies, please contact your local emergency services.
             </p>
           </div>
         </div>
