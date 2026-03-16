@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import logoImage from '../assets/Mann-mitra.png'
 import { useApi } from '../hooks/useApi'
+import { clearStoredAuth } from '../utils/routeAuth'
 
 const AdminDashboardNew = () => {
   const { t } = useTranslation()
@@ -119,6 +120,15 @@ const AdminDashboardNew = () => {
               </button>
               <button className="bg-teal-600 text-white px-5 py-2.5 rounded-xl hover:bg-teal-500 font-medium text-sm transition-all shadow-lg hover:shadow-xl">
                 Generate Report
+              </button>
+              <button
+                onClick={() => {
+                  clearStoredAuth()
+                  navigate('/admin/login')
+                }}
+                className="text-sm text-teal-200 hover:text-white transition-colors px-3 py-2 border border-teal-300/50 rounded-lg hover:bg-white/10"
+              >
+                Logout
               </button>
             </div>
           </div>

@@ -10,9 +10,6 @@ const ChatPlatform = () => {
   const [searchParams] = useSearchParams()
   const { callApi } = useApi()
 
-  console.log('ChatPlatform component loaded')
-  console.log('Search params:', Object.fromEntries(searchParams))
-
   // Core state
   const [user, setUser] = useState(null)
   const [currentChat, setCurrentChat] = useState(null)
@@ -28,6 +25,7 @@ const ChatPlatform = () => {
 
   // Video calling state
   const [inVideoCall, setInVideoCall] = useState(false)
+  const [localVideoTestActive, setLocalVideoTestActive] = useState(false)
   const [incomingCall, setIncomingCall] = useState(null)
   const [callControls, setCallControls] = useState({
     video: true,
@@ -88,40 +86,33 @@ const ChatPlatform = () => {
   }, [searchParams, user])
 
   const initializeUser = () => {
-    console.log('Initializing user...')
-    const userData = localStorage.getItem('Mann-Mitra_user') // Fixed: use correct key
-    const token = localStorage.getItem('Mann-Mitra_token')
-    
-    console.log('User data in localStorage:', userData)
-    console.log('Token in localStorage:', !!token)
-    
-    // Check for test mode parameters
+    const userData = localStorage.getItem('Mann-Mitra_user') || localStorage.getItem('user')
+    const token = localStorage.getItem('Mann-Mitra_token') || localStorage.getItem('token')
     const urlParams = new URLSearchParams(window.location.search)
     const isTestMode = urlParams.get('test') === 'true'
-    
+
     if (isTestMode) {
-      console.log('🧪 Test mode enabled - bypassing authentication')
-      const testUser = {
+      setUser({
         _id: 'test-user-id',
+        id: 'test-user-id',
         name: 'Test User',
         email: 'test@example.com',
         role: 'student'
-      }
-      setUser(testUser)
+      })
       return
     }
-    
+
     if (!userData || !token) {
-      console.log('Missing user data or token, redirecting to login')
-      alert('❌ Authentication required!\n\nPlease log in first to access the chat platform.\n\n💡 Tip: You can test the chat platform by adding "?test=true" to the URL')
+      alert('Please log in first to access the chat.')
       navigate('/login')
       return
     }
-    
+
     try {
       const parsedUser = JSON.parse(userData)
+      if (!parsedUser._id && parsedUser.id) parsedUser._id = parsedUser.id
+      if (!parsedUser.id && parsedUser._id) parsedUser.id = parsedUser._id
       setUser(parsedUser)
-      console.log('Chat user initialized successfully:', parsedUser)
     } catch (error) {
       console.error('Error parsing user data:', error)
       navigate('/login')
@@ -129,9 +120,7 @@ const ChatPlatform = () => {
   }
 
   const initializeSocket = () => {
-    const token = localStorage.getItem('Mann-Mitra_token')
-    
-    // Check for test mode
+    const token = localStorage.getItem('Mann-Mitra_token') || localStorage.getItem('token')
     const urlParams = new URLSearchParams(window.location.search)
     const isTestMode = urlParams.get('test') === 'true'
     
@@ -463,32 +452,28 @@ const ChatPlatform = () => {
     }, 100)
   }
 
-  // Local video test function
+  // Local video test: open preview modal, show camera feed, close stops stream
   const startLocalVideoTest = async () => {
     try {
-      console.log('🎥 Starting local video test...')
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: true, 
-        audio: true 
-      })
-      
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
       localStreamRef.current = stream
-      
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream
-      }
-      
-      // For testing, mirror the local video to remote video too
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = stream
-      }
-      
-      setIsVideoCallActive(true)
-      console.log('✅ Local video test started successfully')
+      setLocalVideoTestActive(true)
+      setTimeout(() => {
+        if (localVideoRef.current) localVideoRef.current.srcObject = stream
+      }, 100)
     } catch (error) {
-      console.error('❌ Local video test failed:', error)
+      console.error('Local video test failed:', error)
       alert('Camera/microphone access denied or not available. Please check permissions.')
     }
+  }
+
+  const closeLocalVideoTest = () => {
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => track.stop())
+      localStreamRef.current = null
+    }
+    if (localVideoRef.current) localVideoRef.current.srcObject = null
+    setLocalVideoTestActive(false)
   }
 
   // Video calling functions
@@ -778,54 +763,56 @@ const ChatPlatform = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
+    <div className="min-h-screen bg-white flex flex-col">
+      {/* Single header: Back + title/participant + status + actions */}
+      <div className="flex-shrink-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-3">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center min-w-0 flex-1">
             <button
               onClick={() => navigate(-1)}
-              className="text-gray-600 hover:text-gray-800"
+              className="flex-shrink-0 text-gray-600 hover:text-gray-900 p-1 -ml-1 rounded"
+              aria-label="Back"
             >
-              ← Back
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
             </button>
-            <h1 className="text-xl font-semibold text-gray-900">
-              {currentChat ? `Chat with ${currentChat.partnerName}` : 'Chat Platform'}
-            </h1>
+            {currentChat ? (
+              <div className="flex items-center gap-3 ml-3 min-w-0">
+                <div className="w-10 h-10 flex-shrink-0 bg-gradient-to-r from-teal-500 to-teal-700 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                  {currentChat.partnerName.charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <h1 className="text-lg font-semibold text-gray-900 truncate">{currentChat.partnerName}</h1>
+                  <p className="text-xs text-gray-500 capitalize">{currentChat.partnerRole}</p>
+                </div>
+              </div>
+            ) : (
+              <h1 className="text-lg font-semibold text-gray-900 ml-3">Chat Platform</h1>
+            )}
           </div>
-          
-          <div className="flex items-center space-x-3">
-            {/* Connection status */}
-            <div className={`flex items-center space-x-2 px-3 py-1 rounded-full text-sm ${
-              isConnected 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-red-100 text-red-800'
-            }`}>
-              <div className={`w-2 h-2 rounded-full ${
-                isConnected ? 'bg-green-500' : 'bg-red-500'
-              }`}></div>
-              <span>{isConnected ? 'Connected' : 'Disconnected'}</span>
-            </div>
 
-            {/* Video call buttons */}
-            {currentChat && !inVideoCall && (
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+              isConnected ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+              {isConnected ? 'Connected' : 'Disconnected'}
+            </div>
+            {currentChat && !inVideoCall && !localVideoTestActive && (
               <>
                 <button
                   onClick={startVideoCall}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+                  className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
                 >
-                  <span>📹</span>
-                  <span>Video Call</span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                  Video Call
                 </button>
-                
-                {/* Local video test button */}
                 <button
                   onClick={startLocalVideoTest}
-                  className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-1 text-sm"
-                  title="Test your camera and microphone locally"
+                  className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium border border-gray-200"
+                  title="Test your camera and microphone"
                 >
-                  <span>🧪</span>
-                  <span>Test Video</span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /></svg>
+                  Test Video
                 </button>
               </>
             )}
@@ -833,57 +820,34 @@ const ChatPlatform = () => {
         </div>
       </div>
 
-      <div className="flex h-[calc(100vh-80px)]">
-        {/* Main Chat Area */}
-        <div className="flex-1 flex flex-col">
-          {!currentChat ? (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="text-2xl">💬</span>
-                </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No Active Chat</h3>
-                <p className="text-gray-600">
-                  Start a conversation by clicking on an appointment or contact.
-                </p>
+      <div className="flex-1 flex flex-col min-h-0">
+        {!currentChat ? (
+          <div className="flex-1 flex items-center justify-center p-8">
+            <div className="text-center max-w-sm">
+              <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
               </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No active chat</h3>
+              <p className="text-gray-600 text-sm">Open a chat from your appointments or booking to start a conversation.</p>
             </div>
-          ) : (
+          </div>
+        ) : (
             <>
-              {/* Chat Header */}
-              <div className="bg-white border-b border-gray-200 px-6 py-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
-                      {currentChat.partnerName.charAt(0)}
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900">{currentChat.partnerName}</h3>
-                      <p className="text-sm text-gray-500 capitalize">{currentChat.partnerRole}</p>
-                    </div>
-                    {onlineUsers.has(currentChat.partnerId) && (
-                      <div className="flex items-center space-x-1 text-green-600">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span className="text-xs">Online</span>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {otherUserTyping && (
-                    <div className="text-sm text-gray-500 italic">
-                      {currentChat.partnerName} is typing...
-                    </div>
-                  )}
+              {/* Typing indicator */}
+              {otherUserTyping && (
+                <div className="flex-shrink-0 px-4 py-2 bg-gray-50 border-b border-gray-100">
+                  <p className="text-sm text-gray-500 italic">{currentChat.partnerName} is typing...</p>
                 </div>
-              </div>
+              )}
 
               {/* Messages Area */}
-              <div 
+              <div
                 ref={messagesContainerRef}
-                className="flex-1 overflow-y-auto p-6 space-y-4"
+                className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-gray-50/50"
               >
                 {messages.map((message, index) => {
-                  const isOwn = message.senderId === user.id
+                  const currentUserId = user?._id || user?.id
+                  const isOwn = message.senderId === currentUserId || message.senderId?._id === currentUserId
                   const showDate = index === 0 || 
                     formatMessageDate(message.timestamp) !== formatMessageDate(messages[index - 1]?.timestamp)
                   
@@ -898,14 +862,14 @@ const ChatPlatform = () => {
                       )}
                       
                       <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                          isOwn 
-                            ? 'bg-blue-600 text-white' 
-                            : 'bg-white text-gray-900 border border-gray-200'
+                        <div className={`max-w-xs lg:max-w-md px-4 py-2.5 rounded-2xl ${
+                          isOwn
+                            ? 'bg-teal-600 text-white rounded-br-md'
+                            : 'bg-white text-gray-900 border border-gray-200 rounded-bl-md'
                         }`}>
                           <p className="text-sm">{message.message}</p>
                           <div className={`flex items-center justify-end mt-1 text-xs ${
-                            isOwn ? 'text-blue-100' : 'text-gray-500'
+                            isOwn ? 'text-teal-100' : 'text-gray-500'
                           }`}>
                             <span>{formatMessageTime(message.timestamp)}</span>
                             {isOwn && message.sent && (
@@ -920,46 +884,29 @@ const ChatPlatform = () => {
               </div>
 
               {/* Input Area */}
-              <div className="bg-white border-t border-gray-200 p-4">
-                <div className="flex items-end space-x-3">
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileUpload}
-                    className="hidden"
-                    accept="image/*,application/pdf,.doc,.docx"
-                  />
-                  
+              <div className="flex-shrink-0 bg-white border-t border-gray-200 p-3 sm:p-4">
+                <div className="flex items-center gap-2 max-w-4xl mx-auto">
+                  <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept="image/*,application/pdf,.doc,.docx" />
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                    className="p-2.5 text-gray-500 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
+                    aria-label="Attach file"
                   >
-                    📎
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
                   </button>
-                  
-                  <div className="flex-1 relative">
-                    <input
-                      ref={inputRef}
-                      type="text"
-                      value={inputMessage}
-                      onChange={(e) => {
-                        setInputMessage(e.target.value)
-                        handleTyping()
-                      }}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') {
-                          sendMessage()
-                        }
-                      }}
-                      placeholder="Type your message..."
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                  
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={inputMessage}
+                    onChange={(e) => { setInputMessage(e.target.value); handleTyping() }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
+                    placeholder="Type your message..."
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent text-gray-900 placeholder-gray-400"
+                  />
                   <button
                     onClick={sendMessage}
                     disabled={!inputMessage.trim()}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="px-5 py-3 bg-teal-600 text-white rounded-xl hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
                   >
                     Send
                   </button>
@@ -967,8 +914,32 @@ const ChatPlatform = () => {
               </div>
             </>
           )}
-        </div>
       </div>
+
+      {/* Local Video Test modal */}
+      {localVideoTestActive && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+              <h3 className="font-semibold text-gray-900">Camera preview</h3>
+              <button
+                onClick={closeLocalVideoTest}
+                className="p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-lg"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="aspect-video bg-gray-900">
+              <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+            </div>
+            <div className="px-4 py-3 border-t border-gray-200 flex justify-end">
+              <button onClick={closeLocalVideoTest} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-medium">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Video Call Modal */}
       {inVideoCall && (

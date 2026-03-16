@@ -202,32 +202,33 @@ const Booking = () => {
 
     if (bookingSuccess) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-100 py-12 px-4 sm:px-6 lg:px-8 flex items-center justify-center">
+      <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 flex items-center justify-center" style={{ backgroundColor: '#F9F7F4' }}>
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center"
+          className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden text-center"
         >
-          <div className="mb-6">
-            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="h-1.5 w-full bg-teal-500"></div>
+          <div className="p-8">
+            <div className="w-16 h-16 bg-[#F9E6D0] rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-teal-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Booking Confirmed!</h2>
-            <p className="text-gray-600 mb-6">
+            <h2 className="text-2xl font-bold text-[#2A3F47] mb-2">Booking Confirmed!</h2>
+            <p className="text-gray-500 mb-6">
               Your counselling session has been successfully booked. You'll receive a confirmation email shortly.
             </p>
-            <div className="space-y-2 mb-6">
+            <div className="space-y-3">
               <Link
                 to="/dashboard"
-                className="w-full bg-indigo-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-indigo-700 transition-colors block"
+                className="w-full bg-teal-800 text-white py-3 px-4 rounded-xl font-medium hover:bg-teal-900 transition-colors block"
               >
                 View in Dashboard
               </Link>
               <button
                 onClick={resetBookingFlow}
-                className="w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+                className="w-full border border-gray-200 text-gray-700 py-3 px-4 rounded-xl font-medium hover:bg-gray-50 transition-colors"
               >
                 Book Another Session
               </button>
@@ -249,32 +250,23 @@ const Booking = () => {
           <p className="text-lg text-gray-600 mb-4">Professional Support System - Direct access to certified counsellors</p>
           
           {/* Flow Explanation */}
-          <div className="rounded-xl p-6 mb-6 border border-gray-200 max-w-4xl mx-auto" style={{ backgroundColor: '#F9E6D0' }}>
-            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center justify-center">
-              <span className="mr-2">👨‍⚕️</span>
+          <div className="rounded-2xl p-6 mb-6 border border-gray-200 max-w-4xl mx-auto" style={{ backgroundColor: '#F9E6D0' }}>
+            <h2 className="text-xl font-semibold text-[#2A3F47] mb-4 text-center">
               How Counsellor Talk Works
             </h2>
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-              <div className="bg-white rounded-lg p-4 text-center">
-                <div className="text-2xl mb-2">📅</div>
-                <div className="font-medium text-gray-900 mb-1">1. Choose Session</div>
-                <div className="text-gray-600">Select chat, video, or offline meet</div>
-              </div>
-              <div className="bg-white rounded-lg p-4 text-center">
-                <div className="text-2xl mb-2">✅</div>
-                <div className="font-medium text-gray-900 mb-1">2. Book & Confirm</div>
-                <div className="text-gray-600">Get confirmation & session link</div>
-              </div>
-              <div className="bg-white rounded-lg p-4 text-center">
-                <div className="text-2xl mb-2">💬</div>
-                <div className="font-medium text-gray-900 mb-1">3. Attend Session</div>
-                <div className="text-gray-600">Meet with certified counsellor</div>
-              </div>
-              <div className="bg-white rounded-lg p-4 text-center">
-                <div className="text-2xl mb-2">📋</div>
-                <div className="font-medium text-gray-900 mb-1">4. Follow-up</div>
-                <div className="text-gray-600">Report sent to admin, further sessions if needed</div>
-              </div>
+              {[
+                { step: '01', title: 'Choose Session', desc: 'Select chat, video, or offline meet' },
+                { step: '02', title: 'Book & Confirm', desc: 'Get confirmation & session link' },
+                { step: '03', title: 'Attend Session', desc: 'Meet with certified counsellor' },
+                { step: '04', title: 'Follow-up', desc: 'Report sent to admin, further sessions if needed' }
+              ].map((item, i) => (
+                <div key={i} className="bg-white rounded-xl p-4 text-center">
+                  <div className="text-xs font-bold text-teal-700 mb-2">{item.step}</div>
+                  <div className="font-medium text-[#2A3F47] mb-1">{item.title}</div>
+                  <div className="text-gray-500 text-xs">{item.desc}</div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -407,7 +399,7 @@ const CounsellorSelection = ({ counsellors, loading, onSelect, t }) => {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-800"></div>
         <span className="ml-3 text-gray-600">{t('booking.loading.counsellors')}</span>
       </div>
     );
@@ -519,7 +511,7 @@ const DateTimeSelection = ({
             onChange={(e) => setSelectedDate(e.target.value)}
             min={getMinDate()}
             max={getMaxDate()}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-lg"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-teal-700 focus:border-teal-700 text-lg"
             required
           />
           <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
@@ -546,10 +538,10 @@ const DateTimeSelection = ({
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => setSelectedTime(slot.value)}
-              className={`p-3 rounded-lg border-2 text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+              className={`p-3 rounded-xl border-2 text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-teal-700 ${
                 selectedTime === slot.value
-                  ? 'bg-indigo-600 text-white border-indigo-600'
-                  : 'bg-white text-gray-700 border-gray-300 hover:border-indigo-300 hover:bg-indigo-50'
+                  ? 'bg-teal-800 text-white border-teal-800'
+                  : 'bg-white text-gray-700 border-gray-200 hover:border-teal-700 hover:bg-teal-50'
               }`}
             >
               {slot.display}
@@ -570,7 +562,7 @@ const DateTimeSelection = ({
           id="session-duration"
           value={selectedDuration}
           onChange={(e) => setSelectedDuration(parseInt(e.target.value))}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-teal-700 focus:border-teal-700"
         >
           <option value={30}>30 minutes</option>
           <option value={60}>60 minutes (Recommended)</option>
@@ -631,10 +623,10 @@ const DateTimeSelection = ({
         whileTap={{ scale: 0.98 }}
         onClick={onNext}
         disabled={!isFormValid}
-        className={`w-full py-3 px-4 rounded-lg font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors ${
+        className={`w-full py-3 px-4 rounded-xl font-semibold focus:outline-none focus:ring-2 focus:ring-teal-700 transition-colors ${
           isFormValid
-            ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            ? 'bg-teal-800 text-white hover:bg-teal-900'
+            : 'bg-gray-200 text-gray-400 cursor-not-allowed'
         }`}
       >
         Continue to Booking Details
@@ -738,8 +730,8 @@ const BookingForm = ({
             Session Type <span className="text-red-500">*</span>
           </label>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <label className={`border-2 p-4 rounded-lg cursor-pointer transition-colors ${
-              appointmentMode === 'chat' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-300 hover:border-gray-400'
+            <label className={`border-2 p-4 rounded-xl cursor-pointer transition-colors ${
+              appointmentMode === 'chat' ? 'border-teal-800 bg-teal-50' : 'border-gray-200 hover:border-gray-300'
             }`}>
               <input
                 type="radio"
@@ -750,14 +742,14 @@ const BookingForm = ({
                 className="sr-only"
               />
               <div className="text-center">
-                <div className="text-2xl mb-2">�</div>
+                <div className="text-sm font-bold text-teal-700 mb-2">CT</div>
                 <div className="font-medium">Online Chat</div>
                 <div className="text-sm text-gray-600">Text-based counselling session</div>
               </div>
             </label>
 
-            <label className={`border-2 p-4 rounded-lg cursor-pointer transition-colors ${
-              appointmentMode === 'video' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-300 hover:border-gray-400'
+            <label className={`border-2 p-4 rounded-xl cursor-pointer transition-colors ${
+              appointmentMode === 'video' ? 'border-teal-800 bg-teal-50' : 'border-gray-200 hover:border-gray-300'
             }`}>
               <input
                 type="radio"
@@ -768,14 +760,14 @@ const BookingForm = ({
                 className="sr-only"
               />
               <div className="text-center">
-                <div className="text-2xl mb-2">📹</div>
+                <div className="text-sm font-bold text-teal-700 mb-2">VC</div>
                 <div className="font-medium">Video Call</div>
                 <div className="text-sm text-gray-600">Face-to-face video consultation</div>
               </div>
             </label>
             
-            <label className={`border-2 p-4 rounded-lg cursor-pointer transition-colors ${
-              appointmentMode === 'in-person' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-300 hover:border-gray-400'
+            <label className={`border-2 p-4 rounded-xl cursor-pointer transition-colors ${
+              appointmentMode === 'in-person' ? 'border-teal-800 bg-teal-50' : 'border-gray-200 hover:border-gray-300'
             }`}>
               <input
                 type="radio"
@@ -786,7 +778,7 @@ const BookingForm = ({
                 className="sr-only"
               />
               <div className="text-center">
-                <div className="text-2xl mb-2">🏢</div>
+                <div className="text-sm font-bold text-teal-700 mb-2">OM</div>
                 <div className="font-medium">Offline Meet</div>
                 <div className="text-sm text-gray-600">On-campus face-to-face meeting</div>
               </div>
@@ -805,7 +797,7 @@ const BookingForm = ({
               type="text"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-teal-700 focus:border-teal-700"
               placeholder="Enter the meeting location (e.g., Counselling Center Room 101)"
               required
             />
@@ -822,7 +814,7 @@ const BookingForm = ({
             rows={3}
             value={appointmentReason}
             onChange={(e) => setAppointmentReason(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 resize-none"
+            className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-teal-700 focus:border-teal-700 resize-none"
             placeholder="Brief description of what you'd like to discuss (optional)"
             maxLength={500}
           />
@@ -838,7 +830,7 @@ const BookingForm = ({
             id="appointmentUrgency"
             value={appointmentUrgency}
             onChange={(e) => setAppointmentUrgency(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-teal-700 focus:border-teal-700"
           >
             <option value="low">Low - General support</option>
             <option value="medium">Medium - Regular counselling</option>
@@ -860,7 +852,7 @@ const BookingForm = ({
             rows={4}
             value={privateNotes}
             onChange={(e) => setPrivateNotes(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 resize-none"
+            className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-teal-700 focus:border-teal-700 resize-none"
             placeholder="Any additional information you'd like your counsellor to know beforehand..."
             maxLength={2000}
           />
@@ -868,9 +860,9 @@ const BookingForm = ({
         </div>
 
         {/* What Happens Next */}
-        <div className="bg-blue-50 rounded-lg p-4 mb-6">
-          <h4 className="font-medium text-blue-900 mb-2">What happens next?</h4>
-          <div className="space-y-2 text-sm text-blue-800">
+        <div className="bg-teal-50 rounded-xl p-4 mb-6">
+          <h4 className="font-medium text-teal-900 mb-2">What happens next?</h4>
+          <div className="space-y-2 text-sm text-teal-800">
             <div className="flex items-start space-x-2">
               <span className="font-medium">1.</span>
               <span>Your booking request will be sent to the counsellor</span>
@@ -904,10 +896,10 @@ const BookingForm = ({
             whileTap={{ scale: 0.98 }}
             type="submit"
             disabled={loading || !isFormValid()}
-            className={`flex-1 py-3 px-4 rounded-md font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
+            className={`flex-1 py-3 px-4 rounded-xl font-semibold focus:outline-none focus:ring-2 focus:ring-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
               isFormValid() && !loading 
-                ? 'bg-indigo-600 text-white hover:bg-indigo-700' 
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                ? 'bg-teal-800 text-white hover:bg-teal-900' 
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
             }`}
           >
             {loading ? (

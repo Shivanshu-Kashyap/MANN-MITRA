@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import Header from './components/Header'
 import ErrorBoundary from './components/ErrorBoundary'
+import RoleProtectedRoute from './components/auth/RoleProtectedRoute'
 import Home from './pages/Home'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -37,9 +38,9 @@ function App() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <Routes>
-        {/* Dashboard routes - no header */}
-        <Route path="/admin/dashboard" element={<AdminDashboardNew />} />
-        <Route path="/counsellor/dashboard" element={<CounsellorDashboard />} />
+        {/* Dashboard routes - protected by role, no header */}
+        <Route path="/admin/dashboard" element={<RoleProtectedRoute requiredRole="admin"><AdminDashboardNew /></RoleProtectedRoute>} />
+        <Route path="/counsellor/dashboard" element={<RoleProtectedRoute requiredRole="counsellor"><CounsellorDashboard /></RoleProtectedRoute>} />
         <Route path="/chat-platform" element={<ChatPlatform />} />
         
         {/* Main app routes - with header and footer */}
@@ -55,7 +56,7 @@ function App() {
                 <Route path="/counsellor/login" element={<CounsellorLogin />} />
                 <Route path="/" element={<Home />} />
                 <Route path="/screening" element={<Screening />} />
-                <Route path='/dashboard' element = {<StudentDashboard/>}/>
+                <Route path="/dashboard" element={<RoleProtectedRoute requiredRole="student"><StudentDashboard /></RoleProtectedRoute>} />
                 <Route path="/chat" element={<Chat />} />
                 <Route path="/booking" element={<Booking />} />
                 <Route path="/appointments" element={<Appointments />} />
