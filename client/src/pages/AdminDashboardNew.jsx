@@ -138,19 +138,22 @@ const AdminDashboardNew = () => {
   // Removed handleRetryAfterRateLimit as rate limit handling is gone
 
   const tabs = [
-    { id: 'overview', name: 'Dashboard Overview', icon: '📊' },
-    { id: 'counsellors', name: 'Counsellor Management', icon: '👥' },
-    { id: 'peer-approval', name: 'Peer Approval', icon: '✋' },
-    { id: 'students', name: 'Student Analytics', icon: '🎓' },
-    { id: 'crisis', name: 'Crisis Management', icon: '🚨' },
-    { id: 'reports', name: 'Reports', icon: '📈' },
-    { id: 'courses', name: 'Course Management', icon: '📚' }
+    { id: 'overview', name: 'Overview' },
+    { id: 'counsellors', name: 'Counsellors' },
+    { id: 'peer-approval', name: 'Peer Approval' },
+    { id: 'students', name: 'Student Analytics' },
+    { id: 'crisis', name: 'Crisis Management' },
+    { id: 'reports', name: 'Reports' },
+    { id: 'courses', name: 'Courses' }
   ]
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-red-600"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-teal-800 mx-auto mb-4"></div>
+          <p className="text-gray-500">Loading dashboard...</p>
+        </div>
       </div>
     )
   }
@@ -158,9 +161,9 @@ const AdminDashboardNew = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b">
+      <div className="bg-[#1A3438] shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
+          <div className="flex justify-between items-center py-4">
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => navigate('/')}
@@ -169,17 +172,22 @@ const AdminDashboardNew = () => {
                 <img 
                   src={logoImage} 
                   alt="Mann-Mitra Logo" 
-                  className="h-32 w-auto"
+                  className="h-14 w-auto brightness-0 invert"
                 />
               </button>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-                <p className="text-gray-600">Manage your Mann-Mitra platform</p>
+              <div className="border-l border-white/20 pl-4">
+                <h1 className="text-xl font-bold text-white">Admin Dashboard</h1>
+                <p className="text-teal-200 text-sm">Manage your Mann-Mitra platform</p>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
-              {/* Removed RateLimitStatusIndicator */}
-              <button className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => navigate('/')}
+                className="text-sm text-teal-200 hover:text-white transition-colors px-3 py-2"
+              >
+                View Site
+              </button>
+              <button className="bg-teal-600 text-white px-5 py-2.5 rounded-xl hover:bg-teal-500 font-medium text-sm transition-all shadow-lg hover:shadow-xl">
                 Generate Report
               </button>
             </div>
@@ -188,20 +196,19 @@ const AdminDashboardNew = () => {
       </div>
 
       {/* Tab Navigation */}
-      <div className="bg-white border-b">
+      <div className="bg-white border-b shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex space-x-8">
+          <nav className="flex space-x-1 overflow-x-auto">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+                className={`py-3.5 px-4 font-medium text-sm whitespace-nowrap rounded-t-lg transition-all ${
                   activeTab === tab.id
-                    ? 'border-red-500 text-red-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'bg-teal-50 text-teal-800 border-b-2 border-teal-800'
+                    : 'text-gray-500 hover:text-teal-800 hover:bg-gray-50'
                 }`}
               >
-                <span className="mr-2">{tab.icon}</span>
                 {tab.name}
               </button>
             ))}
@@ -270,44 +277,42 @@ const OverviewTab = ({ data }) => {
   if (!data) return <div>Loading...</div>
 
   const stats = [
-    { label: 'Total Users', value: data.overview?.totalUsers || 0, change: '+12%', icon: '👥' },
-    { label: 'Active Counsellors', value: data.overview?.activeCounsellors || 0, change: '+5%', icon: '🧑‍⚕️' },
-    { label: 'Appointments Today', value: data.overview?.todayAppointments || 0, change: '+8%', icon: '📅' },
-    { label: 'Crisis Alerts', value: data.overview?.crisisAlerts || 0, change: '-2%', icon: '🚨' }
+    { label: 'Total Users', value: data.overview?.totalUsers || 0, change: '+12%', accent: 'bg-teal-500' },
+    { label: 'Active Counsellors', value: data.overview?.activeCounsellors || 0, change: '+5%', accent: 'bg-amber-500' },
+    { label: 'Appointments Today', value: data.overview?.todayAppointments || 0, change: '+8%', accent: 'bg-sky-500' },
+    { label: 'Crisis Alerts', value: data.overview?.crisisAlerts || 0, change: '-2%', accent: 'bg-rose-500' }
   ]
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat, index) => (
-          <div key={index} className="bg-white p-6 rounded-lg shadow-sm border">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">{stat.label}</p>
-                <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
-                <p className={`text-sm ${stat.change.startsWith('+') ? 'text-green-600' : 'text-red-600'}`}>
-                  {stat.change} from last month
-                </p>
-              </div>
-              <div className="text-4xl">{stat.icon}</div>
+          <div key={index} className="bg-white rounded-2xl shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+            <div className={`h-1.5 w-full ${stat.accent}`}></div>
+            <div className="p-6">
+              <p className="text-sm font-medium text-gray-500 mb-1">{stat.label}</p>
+              <p className="text-3xl font-bold text-[#2A3F47]">{stat.value.toLocaleString()}</p>
+              <p className={`text-sm mt-2 font-medium ${stat.change.startsWith('+') ? 'text-emerald-600' : 'text-rose-600'}`}>
+                {stat.change} from last month
+              </p>
             </div>
           </div>
         ))}
       </div>
 
       {/* Recent Activity */}
-      <div className="bg-white rounded-lg shadow-sm border">
-        <div className="p-6 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">Recent Activity</h3>
+      <div className="bg-white rounded-2xl shadow-md overflow-hidden">
+        <div className="p-6 border-b border-gray-100">
+          <h3 className="text-lg font-semibold text-[#2A3F47]">Recent Activity</h3>
         </div>
         <div className="p-6">
           <div className="space-y-4">
             {[1, 2, 3, 4, 5].map((item) => (
-              <div key={item} className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+              <div key={item} className="flex items-center space-x-3 py-2 hover:bg-gray-50 rounded-lg px-2 -mx-2 transition-colors">
+                <div className="w-2 h-2 bg-teal-500 rounded-full flex-shrink-0"></div>
                 <p className="text-sm text-gray-600">Sample activity item {item}</p>
-                <p className="text-xs text-gray-400 ml-auto">{item} min ago</p>
+                <p className="text-xs text-gray-400 ml-auto whitespace-nowrap">{item} min ago</p>
               </div>
             ))}
           </div>
@@ -329,7 +334,7 @@ const CounsellorManagementTab = ({ counsellors, onRefresh, showAddForm, setShowA
         </div>
         <button
           onClick={() => setShowAddForm(true)}
-          className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
+          className="bg-teal-800 text-white px-5 py-2.5 rounded-xl hover:bg-teal-900 font-medium text-sm transition-all shadow-md hover:shadow-lg"
         >
           + Add Counsellor
         </button>
@@ -347,9 +352,9 @@ const CounsellorManagementTab = ({ counsellors, onRefresh, showAddForm, setShowA
       )}
 
       {/* Counsellors List */}
-      <div className="bg-white rounded-lg shadow-sm border">
-        <div className="p-6 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">Current Counsellors</h3>
+      <div className="bg-white rounded-2xl shadow-md overflow-hidden">
+        <div className="p-6 border-b border-gray-100">
+          <h3 className="text-lg font-semibold text-[#2A3F47]">Current Counsellors</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -451,14 +456,14 @@ const CounsellorRow = ({ counsellor, onRefresh }) => {
       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
         <button
           onClick={() => setIsEditing(true)}
-          className="text-red-600 hover:text-red-900"
+          className="text-teal-700 hover:text-teal-900"
         >
           Edit
         </button>
         <button
           onClick={toggleStatus}
           className={`${
-            counsellor.isActive ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'
+            counsellor.isActive ? 'text-rose-600 hover:text-rose-900' : 'text-emerald-600 hover:text-emerald-900'
           }`}
         >
           {counsellor.isActive ? 'Deactivate' : 'Activate'}
@@ -543,7 +548,7 @@ const AddCounsellorForm = ({ onClose, onSuccess }) => {
                 required
                 value={formData.name}
                 onChange={(e) => setFormData({...formData, name: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-700 focus:border-transparent"
               />
             </div>
 
@@ -556,7 +561,7 @@ const AddCounsellorForm = ({ onClose, onSuccess }) => {
                 required
                 value={formData.email}
                 onChange={(e) => setFormData({...formData, email: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-700 focus:border-transparent"
               />
             </div>
 
@@ -568,7 +573,7 @@ const AddCounsellorForm = ({ onClose, onSuccess }) => {
                 type="text"
                 value={formData.department}
                 onChange={(e) => setFormData({...formData, department: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-700 focus:border-transparent"
               />
             </div>
 
@@ -580,7 +585,7 @@ const AddCounsellorForm = ({ onClose, onSuccess }) => {
                 type="text"
                 value={formData.specialization}
                 onChange={(e) => setFormData({...formData, specialization: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-700 focus:border-transparent"
               />
             </div>
 
@@ -593,7 +598,7 @@ const AddCounsellorForm = ({ onClose, onSuccess }) => {
                 min="0"
                 value={formData.experience}
                 onChange={(e) => setFormData({...formData, experience: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-700 focus:border-transparent"
               />
             </div>
 
@@ -606,7 +611,7 @@ const AddCounsellorForm = ({ onClose, onSuccess }) => {
                 required
                 value={formData.password}
                 onChange={(e) => setFormData({...formData, password: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-700 focus:border-transparent"
               />
             </div>
 
@@ -621,7 +626,7 @@ const AddCounsellorForm = ({ onClose, onSuccess }) => {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
+                className="px-4 py-2 bg-teal-800 text-white rounded-xl hover:bg-teal-900 disabled:opacity-50 font-medium"
               >
                 {isLoading ? 'Creating...' : 'Create Counsellor'}
               </button>
@@ -816,7 +821,7 @@ const StudentAnalyticsTab = () => {
         <div className="bg-white p-6 rounded-lg shadow-sm border">
           <div className="flex items-center">
             <div className="p-3 rounded-full bg-blue-100">
-              <span className="text-2xl">👥</span>
+              <span className="text-sm font-bold text-blue-700">TU</span>
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total Students</p>
@@ -827,7 +832,7 @@ const StudentAnalyticsTab = () => {
         <div className="bg-white p-6 rounded-lg shadow-sm border">
           <div className="flex items-center">
             <div className="p-3 rounded-full bg-green-100">
-              <span className="text-2xl">✅</span>
+              <span className="text-sm font-bold text-green-700">AS</span>
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Active Students</p>
@@ -838,7 +843,7 @@ const StudentAnalyticsTab = () => {
         <div className="bg-white p-6 rounded-lg shadow-sm border">
           <div className="flex items-center">
             <div className="p-3 rounded-full bg-purple-100">
-              <span className="text-2xl">🆕</span>
+              <span className="text-sm font-bold text-purple-700">NR</span>
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">New This Month</p>
@@ -849,7 +854,7 @@ const StudentAnalyticsTab = () => {
         <div className="bg-white p-6 rounded-lg shadow-sm border">
           <div className="flex items-center">
             <div className="p-3 rounded-full bg-yellow-100">
-              <span className="text-2xl">📊</span>
+              <span className="text-sm font-bold text-yellow-700">ER</span>
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Engagement Rate</p>
@@ -1010,7 +1015,7 @@ const CrisisManagementTab = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900">🚨 Crisis Management</h2>
+          <h2 className="text-xl font-semibold text-[#2A3F47]">Crisis Management</h2>
           <p className="text-gray-600">Monitor and manage critical mental health alerts</p>
         </div>
         <div className="flex space-x-2">
@@ -1025,7 +1030,7 @@ const CrisisManagementTab = () => {
         <div className="bg-white p-6 rounded-lg shadow-sm border border-red-200">
           <div className="flex items-center">
             <div className="p-3 rounded-full bg-red-100">
-              <span className="text-2xl">🚨</span>
+              <span className="text-sm font-bold text-red-700">AA</span>
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Active Alerts</p>
@@ -1038,7 +1043,7 @@ const CrisisManagementTab = () => {
         <div className="bg-white p-6 rounded-lg shadow-sm border border-yellow-200">
           <div className="flex items-center">
             <div className="p-3 rounded-full bg-yellow-100">
-              <span className="text-2xl">⚠️</span>
+              <span className="text-sm font-bold text-yellow-700">IP</span>
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">In Progress</p>
@@ -1051,7 +1056,7 @@ const CrisisManagementTab = () => {
         <div className="bg-white p-6 rounded-lg shadow-sm border border-green-200">
           <div className="flex items-center">
             <div className="p-3 rounded-full bg-green-100">
-              <span className="text-2xl">✅</span>
+              <span className="text-sm font-bold text-green-700">RT</span>
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Resolved Today</p>
@@ -1064,7 +1069,7 @@ const CrisisManagementTab = () => {
         <div className="bg-white p-6 rounded-lg shadow-sm border border-blue-200">
           <div className="flex items-center">
             <div className="p-3 rounded-full bg-blue-100">
-              <span className="text-2xl">📞</span>
+              <span className="text-sm font-bold text-blue-700">AR</span>
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Avg Response Time</p>
@@ -1162,12 +1167,12 @@ const ReportsTab = () => {
   const [dateRange, setDateRange] = useState('last-30-days')
 
   const reportTypes = [
-    { id: 'mental-health', name: 'Mental Health Levels Report', icon: '🧠' },
-    { id: 'chatbot', name: 'Chatbot Interaction Report', icon: '🤖' },
-    { id: 'peer-talk', name: 'Peer Talk Sessions Report', icon: '💬' },
-    { id: 'courses', name: 'Course Completion Report', icon: '📚' },
-    { id: 'crisis', name: 'Crisis Intervention Report', icon: '🚨' },
-    { id: 'overall', name: 'Overall Platform Analytics', icon: '📊' }
+    { id: 'mental-health', name: 'Mental Health Levels Report' },
+    { id: 'chatbot', name: 'Chatbot Interaction Report' },
+    { id: 'peer-talk', name: 'Peer Talk Sessions Report' },
+    { id: 'courses', name: 'Course Completion Report' },
+    { id: 'crisis', name: 'Crisis Intervention Report' },
+    { id: 'overall', name: 'Overall Platform Analytics' }
   ]
 
   const sampleReports = {
@@ -1225,7 +1230,7 @@ const ReportsTab = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900">📈 Reports & Analytics</h2>
+          <h2 className="text-xl font-semibold text-[#2A3F47]">Reports & Analytics</h2>
           <p className="text-gray-600">Generate comprehensive reports on platform usage and student well-being</p>
         </div>
       </div>
@@ -1238,16 +1243,13 @@ const ReportsTab = () => {
             <button
               key={type.id}
               onClick={() => setSelectedReportType(type.id)}
-              className={`p-4 rounded-lg border-2 text-left transition-all ${
+              className={`p-4 rounded-xl border-2 text-left transition-all ${
                 selectedReportType === type.id
-                  ? 'border-blue-500 bg-blue-50'
+                  ? 'border-teal-700 bg-teal-50'
                   : 'border-gray-200 hover:border-gray-300'
               }`}
             >
-              <div className="flex items-center space-x-3">
-                <span className="text-2xl">{type.icon}</span>
-                <span className="font-medium text-gray-900">{type.name}</span>
-              </div>
+              <span className="font-medium text-gray-900">{type.name}</span>
             </button>
           ))}
         </div>
@@ -1261,7 +1263,7 @@ const ReportsTab = () => {
             <select
               value={dateRange}
               onChange={(e) => setDateRange(e.target.value)}
-              className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="border border-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-700"
             >
               <option value="last-7-days">Last 7 Days</option>
               <option value="last-30-days">Last 30 Days</option>
@@ -1274,19 +1276,19 @@ const ReportsTab = () => {
           <div className="flex space-x-3">
             <button
               onClick={generateReport}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium"
+              className="bg-teal-800 text-white px-4 py-2 rounded-xl hover:bg-teal-900 font-medium"
             >
               Generate Report
             </button>
             <button
               onClick={() => exportReport('pdf')}
-              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 font-medium"
+              className="bg-emerald-600 text-white px-4 py-2 rounded-xl hover:bg-emerald-700 font-medium"
             >
               Export PDF
             </button>
             <button
               onClick={() => exportReport('csv')}
-              className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 font-medium"
+              className="bg-gray-600 text-white px-4 py-2 rounded-xl hover:bg-gray-700 font-medium"
             >
               Export CSV
             </button>
@@ -1412,12 +1414,12 @@ const CourseManagementTab = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900">📚 Course Management</h2>
+          <h2 className="text-xl font-semibold text-[#2A3F47]">Course Management</h2>
           <p className="text-gray-600">Add and manage mental health courses and resources</p>
         </div>
         <button
           onClick={() => setShowAddCourseForm(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium"
+          className="bg-teal-800 text-white px-5 py-2.5 rounded-xl hover:bg-teal-900 font-medium text-sm transition-all shadow-md"
         >
           + Add New Course
         </button>
@@ -1469,10 +1471,10 @@ const CourseManagementTab = () => {
             </div>
             
             <div className="mt-6 flex space-x-3">
-              <button className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 text-sm font-medium">
+              <button className="flex-1 bg-teal-800 text-white py-2 px-4 rounded-xl hover:bg-teal-900 text-sm font-medium">
                 Edit Course
               </button>
-              <button className="flex-1 bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 text-sm font-medium">
+              <button className="flex-1 bg-gray-100 text-gray-700 py-2 px-4 rounded-xl hover:bg-gray-200 text-sm font-medium">
                 View Details
               </button>
             </div>
@@ -1525,7 +1527,7 @@ const AddCourseForm = ({ onClose, onSave }) => {
                 required
                 value={formData.title}
                 onChange={(e) => setFormData({...formData, title: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-700"
                 placeholder="e.g., Stress Management Techniques"
               />
             </div>
@@ -1539,7 +1541,7 @@ const AddCourseForm = ({ onClose, onSave }) => {
                 rows={4}
                 value={formData.description}
                 onChange={(e) => setFormData({...formData, description: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-700"
                 placeholder="Describe what students will learn in this course..."
               />
             </div>
@@ -1552,7 +1554,7 @@ const AddCourseForm = ({ onClose, onSave }) => {
                 <select
                   value={formData.language}
                   onChange={(e) => setFormData({...formData, language: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-700"
                 >
                   <option value="English">English</option>
                   <option value="Hindi">हिन्दी (Hindi)</option>
@@ -1574,7 +1576,7 @@ const AddCourseForm = ({ onClose, onSave }) => {
                 <select
                   value={formData.duration}
                   onChange={(e) => setFormData({...formData, duration: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-700"
                 >
                   <option value="">Select Duration</option>
                   <option value="1 week">1 Week</option>
@@ -1595,7 +1597,7 @@ const AddCourseForm = ({ onClose, onSave }) => {
                 <select
                   value={formData.level}
                   onChange={(e) => setFormData({...formData, level: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-700"
                 >
                   <option value="Beginner">Beginner</option>
                   <option value="Intermediate">Intermediate</option>
@@ -1610,7 +1612,7 @@ const AddCourseForm = ({ onClose, onSave }) => {
                 <select
                   value={formData.category}
                   onChange={(e) => setFormData({...formData, category: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-700"
                 >
                   <option value="Mental Health">Mental Health</option>
                   <option value="Stress Management">Stress Management</option>
@@ -1631,7 +1633,7 @@ const AddCourseForm = ({ onClose, onSave }) => {
                 type="text"
                 value={formData.tags}
                 onChange={(e) => setFormData({...formData, tags: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-700"
                 placeholder="e.g., stress, anxiety, mindfulness, wellness"
               />
             </div>
@@ -1644,7 +1646,7 @@ const AddCourseForm = ({ onClose, onSave }) => {
                 rows={3}
                 value={formData.resources}
                 onChange={(e) => setFormData({...formData, resources: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-700"
                 placeholder="Links to videos, PDFs, articles, or other helpful resources..."
               />
             </div>
@@ -1659,7 +1661,7 @@ const AddCourseForm = ({ onClose, onSave }) => {
               </button>
               <button
                 type="submit"
-                className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium"
+                className="px-6 py-2 bg-teal-800 text-white rounded-xl hover:bg-teal-900 font-medium"
               >
                 Add Course
               </button>

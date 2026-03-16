@@ -74,10 +74,6 @@ const Register = () => {
       errors.collegeId = 'College ID can only contain letters and numbers'
     }
 
-    if (!formData.role) {
-      errors.role = 'Role selection is required'
-    }
-
     if (!formData.agreeToTerms) {
       errors.agreeToTerms = 'You must agree to the terms and conditions'
     }
