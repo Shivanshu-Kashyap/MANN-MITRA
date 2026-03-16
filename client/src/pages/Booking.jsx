@@ -4,34 +4,6 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { useApi } from '../hooks/useApi';
 
-// Mock data for development/testing
-const mockCounsellors = [
-  {
-    id: 1,
-    name: 'Dr. Sarah Johnson',
-    specialization: 'Clinical Psychology',
-    rating: 4.8,
-    experience: '8 years',
-    profileImage: null,
-  },
-  {
-    id: 2,
-    name: 'Dr. Michael Chen',
-    specialization: 'Academic Counselling',
-    rating: 4.6,
-    experience: '5 years',
-    profileImage: null,
-  },
-  {
-    id: 3,
-    name: 'Dr. Emily Rodriguez',
-    specialization: 'Stress Management',
-    rating: 4.9,
-    experience: '10 years',
-    profileImage: null,
-  },
-];
-
 // Available time slots for each day (9 AM to 6 PM)
 const getAvailableTimeSlots = () => {
   const slots = [];
@@ -83,26 +55,18 @@ const Booking = () => {
   const fetchCounsellors = async () => {
     setLoading(true);
     setError(null);
-    
     try {
-      // Try to fetch from API first
-      if (typeof callApi === 'function') {
-        const response = await callApi('/api/v1/counsellors', 'GET');
-        if (response.success && response.data && response.data.length > 0) {
-          setCounsellors(response.data);
-          setLoading(false);
-          return;
-        }
+      const response = await callApi('/api/v1/counsellors', 'GET');
+      if (response.success && response.data) {
+        const list = Array.isArray(response.data) ? response.data : (response.data.data ?? []);
+        setCounsellors(list);
+      } else {
+        setCounsellors([]);
       }
-      
-      // Fallback to mock data
-      console.log('Using mock counsellors data');
-      setCounsellors(mockCounsellors);
     } catch (err) {
       console.error('Error fetching counsellors:', err);
-      // Use mock data as fallback
-      console.log('Falling back to mock counsellors data');
-      setCounsellors(mockCounsellors);
+      setCounsellors([]);
+      setError(err.message || 'Unable to load counsellors');
     } finally {
       setLoading(false);
     }
@@ -134,7 +98,7 @@ const Booking = () => {
       const endDateTime = new Date(startDateTime.getTime() + selectedDuration * 60 * 1000);
 
       const bookingData = {
-        counsellorId: selectedCounsellor.id,
+        counsellorId: selectedCounsellor.id || selectedCounsellor._id,
         slotStart: startDateTime.toISOString(),
         slotEnd: endDateTime.toISOString(),
         mode: appointmentMode === 'in-person' ? 'in-person' : 'tele',
@@ -147,9 +111,9 @@ const Booking = () => {
       const response = await callApi('/api/v1/appointments', 'POST', bookingData);
       
       if (response.success) {
-        // Store appointment details for dashboard display
+        const apt = response.data?.appointment || response.data
         const appointmentDetails = {
-          id: response.data._id || Date.now(),
+          id: apt?.id || apt?._id || Date.now(),
           counsellor: selectedCounsellor,
           date: selectedDate,
           startTime: selectedTime,
@@ -158,7 +122,7 @@ const Booking = () => {
           reason: appointmentReason,
           urgency: appointmentUrgency,
           location: location,
-          status: response.data.status || 'pending',
+          status: apt?.status || 'pending',
           createdAt: new Date().toISOString()
         };
         

@@ -44,6 +44,7 @@ const AdminLogin = () => {
 
       if (data.success) {
         localStorage.setItem('token', data.token)
+        localStorage.setItem('Mann-Mitra_token', data.token)
         localStorage.setItem('user', JSON.stringify(data.user))
         navigate('/admin/dashboard')
       } else {

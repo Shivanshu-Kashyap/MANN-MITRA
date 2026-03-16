@@ -12,24 +12,23 @@ const getCounsellors = async (req, res) => {
   try {
     const { specialization, available, page = 1, limit = 20 } = req.query;
     
-    // Build query for counsellors
-    let query = {
+    // Build filter for counsellors (only active; user-facing list)
+    const filter = {
       role: 'counsellor',
       isActive: true
     };
     
-    // Filter by specialization if provided
     if (specialization) {
-      query.specialization = { $regex: specialization, $options: 'i' };
+      filter.specialization = { $regex: specialization, $options: 'i' };
     }
     
-    const counsellors = await User.find(query)
+    const counsellors = await User.find(filter)
       .select('name email specialization profileImage rating experience languagePref createdAt')
       .sort({ rating: -1, createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
     
-    const total = await User.countDocuments(query);
+    const total = await User.countDocuments(filter);
     
     // Format counsellors for frontend
     const formattedCounsellors = counsellors.map(counsellor => ({

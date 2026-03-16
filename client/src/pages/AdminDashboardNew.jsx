@@ -1,74 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import logoImage from '../assets/Mann-mitra.png' // Assuming this path is correct
-
-// Mock API Call function to replace useEnhancedApi's apiCall
-// In a real application, you'd replace the body of this with your actual fetch logic
-const mockApiCall = async (url, method, body = null) => {
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 500))
-
-  try {
-    const token = localStorage.getItem('token')
-    const headers = {
-      'Content-Type': 'application/json',
-      'Authorization': token ? `Bearer ${token}` : ''
-    }
-
-    const config = {
-      method: method,
-      headers: headers,
-      body: body ? JSON.stringify(body) : undefined
-    }
-
-    // Replace the real fetch with mock data for simplicity if the backend is not set up
-    if (url === '/api/v1/admin/overview') {
-      return {
-        success: true,
-        data: {
-          overview: {
-            totalUsers: 3450,
-            activeCounsellors: 42,
-            todayAppointments: 12,
-            crisisAlerts: 3
-          }
-        }
-      }
-    } else if (url === '/api/v1/admin/counsellors') {
-      return {
-        success: true,
-        data: [
-          { id: 101, name: 'Dr. Priya Sharma', email: 'priya@mannmitra.com', department: 'Psychology', specialization: 'Child Counseling', isActive: true },
-          { id: 102, name: 'Mr. Vivek Singh', email: 'vivek@mannmitra.com', department: 'Social Work', specialization: 'Substance Abuse', isActive: false },
-          { id: 103, name: 'Dr. Anita Rao', email: 'anita@mannmitra.com', department: 'Mental Health', specialization: 'Anxiety', isActive: true },
-        ]
-      }
-    }
-
-    // Fallback for actual fetch if mock data doesn't cover the URL
-    // const response = await fetch(url, config)
-    // const data = await response.json()
-    
-    // if (!response.ok) {
-    //   throw new Error(data.message || `API call to ${url} failed with status ${response.status}`)
-    // }
-
-    // return { success: true, data: data }
-    return { success: false, error: `Mock: Unknown API endpoint: ${url}` }
-
-  } catch (error) {
-    return { success: false, error: error.message || 'Network error' }
-  }
-}
-
-// Helper to fetch the token from localStorage
-const getToken = () => localStorage.getItem('token')
+import logoImage from '../assets/Mann-mitra.png'
+import { useApi } from '../hooks/useApi'
 
 const AdminDashboardNew = () => {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  // Removed: const { apiCall, loading, error, rateLimitError, retryCount, clearRateLimitError } = useEnhancedApi()
+  const { callApi } = useApi()
   
   const [activeTab, setActiveTab] = useState('overview')
   const [counsellors, setCounsellors] = useState([])
@@ -77,11 +16,8 @@ const AdminDashboardNew = () => {
   const [showAddCounsellor, setShowAddCounsellor] = useState(false)
   const [apiError, setApiError] = useState(null)
 
-  // Fetch dashboard data and counsellors on tab change
   useEffect(() => {
-    // Clear old errors when tab changes
     setApiError(null)
-
     if (activeTab === 'overview') {
       fetchDashboardData()
     } else if (activeTab === 'counsellors') {
@@ -91,7 +27,6 @@ const AdminDashboardNew = () => {
     }
   }, [activeTab])
 
-  // Initial data fetch on mount
   useEffect(() => {
     fetchDashboardData()
   }, [])
@@ -99,43 +34,37 @@ const AdminDashboardNew = () => {
   const fetchDashboardData = async () => {
     setIsLoading(true)
     setApiError(null)
-    
-    // Replacing apiCall with mockApiCall
     try {
-      const result = await mockApiCall('/api/v1/admin/overview', 'GET')
-      
-      if (result.success) {
-        setDashboardData(result.data)
+      const result = await callApi('/api/v1/admin/overview', 'GET')
+      if (result.success && result.data) {
+        setDashboardData(result.data?.overview ? { overview: result.data.overview } : result.data)
       } else {
-        setApiError(result.error || 'Failed to fetch dashboard data')
+        setDashboardData({ overview: { totalUsers: 0, activeCounsellors: 0, todayAppointments: 0, crisisAlerts: 0 } })
       }
     } catch (err) {
       setApiError(err.message || 'Failed to fetch dashboard data')
+      setDashboardData({ overview: { totalUsers: 0, activeCounsellors: 0, todayAppointments: 0, crisisAlerts: 0 } })
     } finally {
       setIsLoading(false)
     }
   }
 
   const fetchCounsellors = async () => {
-    // Note: This is now called via the useEffect upon tab change, so the initial setIsLoading should happen outside or be managed to avoid double-loading.
-    // We'll only set API error here, keeping isLoading to false if it was already resolved by fetchDashboardData
     setApiError(null)
-
-    // Replacing apiCall with mockApiCall
     try {
-      const result = await mockApiCall('/api/v1/admin/counsellors', 'GET')
-      
-      if (result.success) {
-        setCounsellors(result.data)
+      const result = await callApi('/api/v1/admin/counsellors', 'GET')
+      if (result.success && result.data) {
+        const list = Array.isArray(result.data) ? result.data : (result.data?.data ?? [])
+        setCounsellors(list)
       } else {
-        setApiError(result.error || 'Failed to fetch counsellors')
+        setCounsellors([])
+        if (!result.success) setApiError(result.error || 'Failed to fetch counsellors')
       }
     } catch (err) {
       setApiError(err.message || 'Failed to fetch counsellors')
+      setCounsellors([])
     }
   }
-  
-  // Removed handleRetryAfterRateLimit as rate limit handling is gone
 
   const tabs = [
     { id: 'overview', name: 'Overview' },
@@ -262,6 +191,7 @@ const AdminDashboardNew = () => {
             onRefresh={fetchCounsellors}
             showAddForm={showAddCounsellor}
             setShowAddForm={setShowAddCounsellor}
+            callApi={callApi}
           />
         )}
         {activeTab === 'peer-approval' && <PeerApprovalTab />}
@@ -361,7 +291,10 @@ const RiskDashboardTab = () => {
                     {c.risk_score}
                   </div>
                   <div>
-                    <p className="font-medium text-gray-900">{c.anonymous_id}</p>
+                    <p className="font-medium text-gray-900">
+                      {c.display_name || c.user_name || c.anonymous_id}
+                      {c.user_name && <span className="ml-2 text-xs text-gray-400 font-normal">({c.anonymous_id})</span>}
+                    </p>
                     <p className="text-sm text-gray-500 max-w-md truncate">{c.risk_summary}</p>
                   </div>
                 </div>
@@ -467,10 +400,9 @@ const OverviewTab = ({ data }) => {
 }
 
 // Counsellor Management Tab Component
-const CounsellorManagementTab = ({ counsellors, onRefresh, showAddForm, setShowAddForm }) => {
+const CounsellorManagementTab = ({ counsellors, onRefresh, showAddForm, setShowAddForm, callApi }) => {
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-xl font-semibold text-gray-900">Counsellor Management</h2>
@@ -484,7 +416,6 @@ const CounsellorManagementTab = ({ counsellors, onRefresh, showAddForm, setShowA
         </button>
       </div>
 
-      {/* Add Counsellor Form */}
       {showAddForm && (
         <AddCounsellorForm
           onClose={() => setShowAddForm(false)}
@@ -492,10 +423,10 @@ const CounsellorManagementTab = ({ counsellors, onRefresh, showAddForm, setShowA
             setShowAddForm(false)
             onRefresh()
           }}
+          callApi={callApi}
         />
       )}
 
-      {/* Counsellors List */}
       <div className="bg-white rounded-2xl shadow-md overflow-hidden">
         <div className="p-6 border-b border-gray-100">
           <h3 className="text-lg font-semibold text-[#2A3F47]">Current Counsellors</h3>
@@ -504,31 +435,25 @@ const CounsellorManagementTab = ({ counsellors, onRefresh, showAddForm, setShowA
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Counsellor
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Department
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Specialization
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Counsellor</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Specialization</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {counsellors.map((counsellor) => (
-                <CounsellorRow
-                  key={counsellor.id}
-                  counsellor={counsellor}
-                  onRefresh={onRefresh}
-                />
-              ))}
+              {counsellors.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                    No counsellors yet. Add one to get started.
+                  </td>
+                </tr>
+              ) : (
+                counsellors.map((c) => (
+                  <CounsellorRow key={c.id || c._id} counsellor={c} onRefresh={onRefresh} callApi={callApi} />
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -538,87 +463,83 @@ const CounsellorManagementTab = ({ counsellors, onRefresh, showAddForm, setShowA
 }
 
 // Individual Counsellor Row Component
-const CounsellorRow = ({ counsellor, onRefresh }) => {
+const CounsellorRow = ({ counsellor, onRefresh, callApi }) => {
   const [isEditing, setIsEditing] = useState(false)
+  const [showDetail, setShowDetail] = useState(false)
+  const id = counsellor.id || counsellor._id
 
   const toggleStatus = async () => {
     try {
-      // Using standard fetch and getToken helper
-      const token = getToken()
-      const response = await fetch(`/api/v1/admin/counsellors/${counsellor.id}/status`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ isActive: !counsellor.isActive })
-      })
+      const result = await callApi(`/api/v1/admin/counsellors/${id}/status`, 'PATCH', { isActive: !counsellor.isActive })
+      if (result.success) onRefresh()
+      else alert(result.error || 'Failed to update status')
+    } catch (e) {
+      alert(e.message || 'Failed to update status')
+    }
+  }
 
-      if (!response.ok) {
-        throw new Error('Failed to toggle status')
-      }
-
-      onRefresh()
-    } catch (error) {
-      console.error('Error toggling counsellor status:', error)
-      alert(`Error: ${error.message}`) // Simple error display
+  const handleDelete = async () => {
+    if (!window.confirm(`Deactivate counsellor "${counsellor.name}"? They will no longer receive new bookings.`)) return
+    try {
+      const result = await callApi(`/api/v1/admin/counsellors/${id}`, 'DELETE')
+      if (result.success) onRefresh()
+      else alert(result.error || 'Failed to deactivate')
+    } catch (e) {
+      alert(e.message || 'Failed to deactivate')
     }
   }
 
   return (
-    <tr>
-      <td className="px-6 py-4 whitespace-nowrap">
-        <div className="flex items-center">
-          <div className="h-10 w-10 flex-shrink-0">
-            <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
-              <span className="text-sm font-medium text-gray-700">
-                {counsellor.name.charAt(0).toUpperCase()}
-              </span>
+    <>
+      <tr>
+        <td className="px-6 py-4 whitespace-nowrap">
+          <div className="flex items-center">
+            <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center flex-shrink-0">
+              <span className="text-sm font-medium text-gray-700">{counsellor.name.charAt(0).toUpperCase()}</span>
+            </div>
+            <div className="ml-4">
+              <div className="text-sm font-medium text-gray-900">{counsellor.name}</div>
+              <div className="text-sm text-gray-500">{counsellor.email}</div>
             </div>
           </div>
-          <div className="ml-4">
-            <div className="text-sm font-medium text-gray-900">{counsellor.name}</div>
-            <div className="text-sm text-gray-500">{counsellor.email}</div>
-          </div>
-        </div>
-      </td>
-      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-        {counsellor.department || 'Not specified'}
-      </td>
-      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-        {counsellor.specialization || 'General Counselling'}
-      </td>
-      <td className="px-6 py-4 whitespace-nowrap">
-        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-          counsellor.isActive 
-            ? 'bg-green-100 text-green-800' 
-            : 'bg-red-100 text-red-800'
-        }`}>
-          {counsellor.isActive ? 'Active' : 'Inactive'}
-        </span>
-      </td>
-      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-        <button
-          onClick={() => setIsEditing(true)}
-          className="text-teal-700 hover:text-teal-900"
-        >
-          Edit
-        </button>
-        <button
-          onClick={toggleStatus}
-          className={`${
-            counsellor.isActive ? 'text-rose-600 hover:text-rose-900' : 'text-emerald-600 hover:text-emerald-900'
-          }`}
-        >
-          {counsellor.isActive ? 'Deactivate' : 'Activate'}
-        </button>
-      </td>
-    </tr>
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{counsellor.department || 'Not specified'}</td>
+        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{counsellor.specialization || 'General Counselling'}</td>
+        <td className="px-6 py-4 whitespace-nowrap">
+          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${counsellor.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+            {counsellor.isActive ? 'Active' : 'Inactive'}
+          </span>
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+          <button type="button" onClick={() => setShowDetail(true)} className="text-teal-700 hover:text-teal-900">View</button>
+          <button type="button" onClick={() => setIsEditing(true)} className="text-teal-700 hover:text-teal-900">Edit</button>
+          <button type="button" onClick={toggleStatus} className={counsellor.isActive ? 'text-rose-600 hover:text-rose-900' : 'text-emerald-600 hover:text-emerald-900'}>
+            {counsellor.isActive ? 'Deactivate' : 'Activate'}
+          </button>
+          <button type="button" onClick={handleDelete} className="text-red-600 hover:text-red-900">Delete</button>
+        </td>
+      </tr>
+      {isEditing && (
+        <EditCounsellorForm
+          counsellor={counsellor}
+          onClose={() => setIsEditing(false)}
+          onSuccess={() => { setIsEditing(false); onRefresh(); }}
+          callApi={callApi}
+        />
+      )}
+      {showDetail && (
+        <CounsellorDetailModal
+          counsellor={counsellor}
+          onClose={() => setShowDetail(false)}
+          callApi={callApi}
+        />
+      )}
+    </>
   )
 }
 
 // Add Counsellor Form Component
-const AddCounsellorForm = ({ onClose, onSuccess }) => {
+const AddCounsellorForm = ({ onClose, onSuccess, callApi }) => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -634,29 +555,12 @@ const AddCounsellorForm = ({ onClose, onSuccess }) => {
     e.preventDefault()
     setIsLoading(true)
     setError('')
-
     try {
-      // Using standard fetch and getToken helper
-      const token = getToken()
-      const response = await fetch('/api/v1/admin/counsellors', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
-      })
-
-      const data = await response.json()
-
-      if (response.ok && data.success) { // Check both HTTP status and API response success flag
-        onSuccess()
-      } else {
-        setError(data.message || 'Failed to create counsellor')
-      }
-    } catch (error) {
-      console.error('Error creating counsellor:', error)
-      setError('Failed to create counsellor due to a network or server issue.')
+      const result = await callApi('/api/v1/admin/counsellors', 'POST', formData)
+      if (result.success) onSuccess()
+      else setError(result.error || result.message || 'Failed to create counsellor')
+    } catch (err) {
+      setError(err.message || 'Failed to create counsellor')
     } finally {
       setIsLoading(false)
     }
@@ -760,22 +664,168 @@ const AddCounsellorForm = ({ onClose, onSuccess }) => {
             </div>
 
             <div className="flex justify-end space-x-3 pt-4">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="px-4 py-2 bg-teal-800 text-white rounded-xl hover:bg-teal-900 disabled:opacity-50 font-medium"
-              >
+              <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">Cancel</button>
+              <button type="submit" disabled={isLoading} className="px-4 py-2 bg-teal-800 text-white rounded-xl hover:bg-teal-900 disabled:opacity-50 font-medium">
                 {isLoading ? 'Creating...' : 'Create Counsellor'}
               </button>
             </div>
           </form>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Edit Counsellor Form (modal)
+const EditCounsellorForm = ({ counsellor, onClose, onSuccess, callApi }) => {
+  const id = counsellor.id || counsellor._id
+  const [formData, setFormData] = useState({
+    name: counsellor.name || '',
+    department: counsellor.department || '',
+    specialization: counsellor.specialization || '',
+    experience: counsellor.experience ?? '',
+    isActive: counsellor.isActive !== false
+  })
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setError('')
+    try {
+      const result = await callApi(`/api/v1/admin/counsellors/${id}`, 'PUT', formData)
+      if (result.success) onSuccess()
+      else setError(result.error || result.message || 'Failed to update')
+    } catch (err) {
+      setError(err.message || 'Failed to update')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-medium text-gray-900">Edit Counsellor</h3>
+            <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
+          </div>
+          {error && <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4"><p className="text-red-700 text-sm">{error}</p></div>}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+              <input type="text" required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-700" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+              <input type="text" value={formData.department} onChange={(e) => setFormData({ ...formData, department: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-700" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Specialization</label>
+              <input type="text" value={formData.specialization} onChange={(e) => setFormData({ ...formData, specialization: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-700" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Experience (Years)</label>
+              <input type="number" min={0} value={formData.experience} onChange={(e) => setFormData({ ...formData, experience: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-700" />
+            </div>
+            <div className="flex items-center">
+              <input type="checkbox" id="edit-active" checked={formData.isActive} onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })} className="rounded border-gray-300 text-teal-800 focus:ring-teal-700" />
+              <label htmlFor="edit-active" className="ml-2 text-sm text-gray-700">Active (available for bookings)</label>
+            </div>
+            <div className="flex justify-end space-x-3 pt-4">
+              <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">Cancel</button>
+              <button type="submit" disabled={isLoading} className="px-4 py-2 bg-teal-800 text-white rounded-xl hover:bg-teal-900 disabled:opacity-50 font-medium">{isLoading ? 'Saving...' : 'Save'}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Counsellor detail modal: counsellor info + completed sessions (student name, level, description)
+const CounsellorDetailModal = ({ counsellor, onClose, callApi }) => {
+  const [detail, setDetail] = useState(null)
+  const [appointments, setAppointments] = useState([])
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    const id = counsellor.id || counsellor._id
+    let cancelled = false
+    const run = async () => {
+      setLoading(true)
+      try {
+        const [resC, resA] = await Promise.all([
+          callApi(`/api/v1/admin/counsellors/${id}`, 'GET'),
+          callApi(`/api/v1/appointments/admin/all?counsellorId=${id}&limit=100`, 'GET')
+        ])
+        if (!cancelled) {
+          if (resC.success && resC.data) setDetail(resC.data?.data ?? resC.data)
+          if (resA.success && resA.data) {
+            const list = resA.data?.appointments ?? (Array.isArray(resA.data) ? resA.data : [])
+            setAppointments(list)
+          }
+        }
+      } catch (_) {}
+      if (!cancelled) setLoading(false)
+    }
+    run()
+    return () => { cancelled = true }
+  }, [counsellor.id, counsellor._id, callApi])
+
+  const completed = appointments.filter(a => a.status === 'completed')
+  const riskColors = { low: 'bg-green-100 text-green-800', medium: 'bg-yellow-100 text-yellow-800', high: 'bg-orange-100 text-orange-800', critical: 'bg-red-100 text-red-800' }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto py-8">
+      <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col">
+        <div className="p-6 border-b flex justify-between items-center">
+          <h2 className="text-xl font-semibold text-gray-900">Counsellor: {counsellor.name}</h2>
+          <button type="button" onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
+        </div>
+        <div className="p-6 overflow-y-auto flex-1">
+          {loading ? (
+            <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-10 w-10 border-2 border-teal-600 border-t-transparent" /></div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
+                <p><span className="text-gray-500">Email:</span> {counsellor.email}</p>
+                <p><span className="text-gray-500">Department:</span> {counsellor.department || '—'}</p>
+                <p><span className="text-gray-500">Specialization:</span> {counsellor.specialization || '—'}</p>
+                <p><span className="text-gray-500">Status:</span> {counsellor.isActive ? 'Active' : 'Inactive'}</p>
+              </div>
+              <h3 className="font-semibold text-gray-900 mb-3">Completed sessions (with user names)</h3>
+              {completed.length === 0 ? (
+                <p className="text-gray-500">No completed sessions yet.</p>
+              ) : (
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Level</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Summary</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {completed.map((apt) => (
+                        <tr key={apt._id}>
+                          <td className="px-4 py-2 text-sm font-medium text-gray-900">{apt.studentId?.name ?? '—'}</td>
+                          <td className="px-4 py-2 text-sm text-gray-600">{apt.slotStart ? new Date(apt.slotStart).toLocaleDateString() : '—'}</td>
+                          <td className="px-4 py-2">
+                            {apt.sessionRiskLevel ? <span className={`px-2 py-0.5 rounded text-xs font-medium ${riskColors[apt.sessionRiskLevel] || ''}`}>{apt.sessionRiskLevel}</span> : '—'}
+                          </td>
+                          <td className="px-4 py-2 text-sm text-gray-600 max-w-xs truncate" title={apt.sessionSummary}>{apt.sessionSummary || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>

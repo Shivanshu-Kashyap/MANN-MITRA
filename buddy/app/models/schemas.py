@@ -25,6 +25,7 @@ class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=3000)
     session_id: str = Field(default="")
     user_id: Optional[str] = None
+    user_name: Optional[str] = None
     language: str = "en"
 
 
@@ -129,6 +130,8 @@ class AdminAlert(BaseModel):
 class RiskDashboardEntry(BaseModel):
     session_id: str
     anonymous_id: str
+    user_name: Optional[str] = None
+    display_name: str = ""
     risk_level: RiskLevel
     risk_score: int
     risk_summary: str

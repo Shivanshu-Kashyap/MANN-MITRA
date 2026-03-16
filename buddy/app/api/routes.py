@@ -70,6 +70,7 @@ async def chat(req: ChatRequest):
             risk_level=result.risk_assessment.risk_level.value,
             risk_summary=result.risk_assessment.explanation,
             user_id=req.user_id,
+            user_name=req.user_name,
         )
     except Exception as e:
         print(f"[Chat] MongoDB save error: {e}")
@@ -118,6 +119,7 @@ async def chat_text(req: ChatRequest):
             risk_level=result.risk_assessment.risk_level.value,
             risk_summary=result.risk_assessment.explanation,
             user_id=req.user_id,
+            user_name=req.user_name,
         )
     except Exception as e:
         print(f"[ChatText] MongoDB save error: {e}")
@@ -266,10 +268,16 @@ async def risk_dashboard():
 
     dashboard_entries = []
     for s in high_risk:
+        stored_name = s.get("user_name") or None
+        anon_id = f"ANON-{s.get('session_id', '')[:8].upper()}"
+        display = stored_name if stored_name else anon_id
+
         dashboard_entries.append(
             RiskDashboardEntry(
                 session_id=s.get("session_id", ""),
-                anonymous_id=f"ANON-{s.get('session_id', '')[:8].upper()}",
+                anonymous_id=anon_id,
+                user_name=stored_name,
+                display_name=display,
                 risk_level=RiskLevel(s.get("risk_level", "low")),
                 risk_score=s.get("risk_score", 0),
                 risk_summary=s.get("risk_summary", ""),

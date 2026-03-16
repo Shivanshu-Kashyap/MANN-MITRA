@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { io } from 'socket.io-client'
 import { useApi } from '../utils/api'
+import { useAuth } from '../contexts/AuthContext'
 import CrisisModal from '../components/CrisisModal'
 
 const RISK_COLORS = {
@@ -13,6 +14,7 @@ const RISK_COLORS = {
 
 const Chat = () => {
   const { t } = useTranslation()
+  const { user } = useAuth()
   const [isVoiceMode, setIsVoiceMode] = useState(false)
   const [isListening, setIsListening] = useState(false)
   const [severityLevel, setSeverityLevel] = useState(null)
@@ -203,7 +205,9 @@ const Chat = () => {
           body: JSON.stringify({
             text: transcript,
             session_id: `voice_session_${Date.now()}`,
-            response_format: "json"
+            response_format: "json",
+            user_id: user?._id || null,
+            user_name: user?.name || null
           })
         })
 
@@ -387,7 +391,9 @@ const Chat = () => {
             body: JSON.stringify({
               message: textToSend,
               session_id: sessionId,
-              response_format: "json"
+              response_format: "json",
+              user_id: user?._id || null,
+              user_name: user?.name || null
             })
           })
 
@@ -442,7 +448,9 @@ const Chat = () => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               message: textToSend,
-              session_id: sessionId
+              session_id: sessionId,
+              user_id: user?._id || null,
+              user_name: user?.name || null
             })
           })
 

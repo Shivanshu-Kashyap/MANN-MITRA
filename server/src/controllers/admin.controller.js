@@ -928,7 +928,7 @@ const deleteCounsellor = async (req, res, next) => {
     // Check if counsellor has any active appointments
     const activeAppointments = await Appointment.countDocuments({
       counsellorId: req.params.id,
-      status: { $in: ['scheduled', 'pending'] }
+      status: { $in: ['requested', 'confirmed'] }
     });
 
     if (activeAppointments > 0) {

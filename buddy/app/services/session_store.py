@@ -46,21 +46,26 @@ class SessionStore:
         risk_level: str,
         risk_summary: str,
         user_id: Optional[str] = None,
+        user_name: Optional[str] = None,
     ):
         if self._db is None:
             return
         sessions = self._db["chat_sessions"]
 
+        set_fields = {
+            "user_id": user_id,
+            "risk_level": risk_level,
+            "risk_score": risk_score,
+            "risk_summary": risk_summary,
+            "updated_at": datetime.utcnow(),
+        }
+        if user_name:
+            set_fields["user_name"] = user_name
+
         await sessions.update_one(
             {"session_id": session_id},
             {
-                "$set": {
-                    "user_id": user_id,
-                    "risk_level": risk_level,
-                    "risk_score": risk_score,
-                    "risk_summary": risk_summary,
-                    "updated_at": datetime.utcnow(),
-                },
+                "$set": set_fields,
                 "$push": {
                     "messages": {
                         "$each": [

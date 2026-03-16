@@ -78,6 +78,12 @@ const createAppointment = async (req, res, next) => {
         message: 'Selected user is not authorized to provide counselling services'
       });
     }
+    if (counsellor.role === 'counsellor' && counsellor.isActive === false) {
+      return res.status(400).json({
+        success: false,
+        message: 'This counsellor is not currently available for bookings'
+      });
+    }
 
     // CRITICAL: Check counsellor availability to prevent double bookings
     const availabilityCheck = await Appointment.checkAvailability(
@@ -230,6 +236,7 @@ const getMyAppointments = async (req, res, next) => {
       .populate('counsellorId', 'name email')
       .populate('cancelledBy', 'name email')
       .populate('confirmedBy', 'name email')
+      .populate('completedBy', 'name email')
       .sort({ slotStart: 1 });
 
     // Decrypt private notes for each appointment if user is authorized
@@ -275,7 +282,8 @@ const getAppointment = async (req, res, next) => {
       .populate('studentId', 'name email collegeId')
       .populate('counsellorId', 'name email')
       .populate('cancelledBy', 'name email')
-      .populate('confirmedBy', 'name email');
+      .populate('confirmedBy', 'name email')
+      .populate('completedBy', 'name email');
 
     if (!appointment) {
       return res.status(404).json({
@@ -333,7 +341,7 @@ const updateAppointmentStatus = async (req, res, next) => {
     }
 
     const appointmentId = req.params.id;
-    const { status, cancellationReason, location, meetingLink, meetingId } = req.body;
+    const { status, cancellationReason, location, meetingLink, meetingId, sessionRiskLevel, sessionSummary } = req.body;
 
     const appointment = await Appointment.findById(appointmentId);
     if (!appointment) {
@@ -397,7 +405,16 @@ const updateAppointmentStatus = async (req, res, next) => {
           break;
 
         case 'completed':
-          await appointment.complete();
+          appointment.status = 'completed';
+          appointment.completedAt = new Date();
+          appointment.completedBy = req.user.id;
+          if (sessionRiskLevel && ['low', 'medium', 'high', 'critical'].includes(sessionRiskLevel)) {
+            appointment.sessionRiskLevel = sessionRiskLevel;
+          }
+          if (sessionSummary && typeof sessionSummary === 'string') {
+            appointment.sessionSummary = sessionSummary.trim().slice(0, 2000);
+          }
+          await appointment.save();
           break;
 
         case 'no-show':
@@ -415,7 +432,8 @@ const updateAppointmentStatus = async (req, res, next) => {
         { path: 'studentId', select: 'name email collegeId' },
         { path: 'counsellorId', select: 'name email' },
         { path: 'cancelledBy', select: 'name email' },
-        { path: 'confirmedBy', select: 'name email' }
+        { path: 'confirmedBy', select: 'name email' },
+        { path: 'completedBy', select: 'name email' }
       ]);
 
       res.status(200).json({

@@ -390,11 +390,14 @@ const DashboardTab = () => {
 
 // Appointments Management Tab
 const AppointmentsTab = () => {
+  const navigate = useNavigate()
   const { callApi } = useApi()
   const [appointments, setAppointments] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [filter, setFilter] = useState('all')
+  const [completeSessionAppointment, setCompleteSessionAppointment] = useState(null)
+  const [completeForm, setCompleteForm] = useState({ sessionRiskLevel: 'low', sessionSummary: '' })
   
   useEffect(() => {
     fetchAppointments()
@@ -507,30 +510,43 @@ const AppointmentsTab = () => {
   }
 
   const handleJoinSession = (appointment) => {
-    console.log('joinSession called with appointment:', appointment)
-    console.log('Appointment mode:', appointment.mode)
-    console.log('Appointment _id:', appointment._id)
-    console.log('Student ID:', appointment.studentId)
-    
     try {
       if (appointment.mode === 'video' || appointment.mode === 'tele' || appointment.mode === 'chat') {
         const studentId = appointment.studentId?._id || appointment.studentId
         const chatUrl = `/chat-platform?appointment=${appointment._id}&user=${studentId}`
-        console.log('Navigating to:', chatUrl)
-        
-        // Use window.location as fallback if navigate doesn't work
-        if (typeof navigate === 'function') {
-          navigate(chatUrl)
-        } else {
-          console.error('Navigate function not available, using window.location')
-          window.location.href = chatUrl
-        }
+        navigate(chatUrl)
       } else {
-        alert('Please prepare for the in-person session at the scheduled time')
+        alert('Please prepare for the in-person session at the scheduled time and location.')
       }
     } catch (error) {
       console.error('Error in joinSession:', error)
-      alert('Unable to join session. Please try refreshing the page.')
+      alert('Unable to join session. Please try again.')
+    }
+  }
+
+  const handleOpenCompleteForm = (appointment) => {
+    setCompleteSessionAppointment(appointment)
+    setCompleteForm({ sessionRiskLevel: 'low', sessionSummary: '' })
+  }
+
+  const handleSubmitCompleteSession = async () => {
+    if (!completeSessionAppointment) return
+    const id = completeSessionAppointment._id || completeSessionAppointment.id
+    try {
+      const response = await callApi(`/api/v1/appointments/${id}/status`, 'PATCH', {
+        status: 'completed',
+        sessionRiskLevel: completeForm.sessionRiskLevel,
+        sessionSummary: completeForm.sessionSummary.trim() || undefined
+      })
+      if (response.success) {
+        setCompleteSessionAppointment(null)
+        fetchAppointments()
+        alert('Session marked complete and report saved.')
+      } else {
+        alert(response.error || 'Failed to complete session')
+      }
+    } catch (err) {
+      alert(err.message || 'Failed to complete session')
     }
   }
 
@@ -732,14 +748,20 @@ const AppointmentsTab = () => {
                           </div>
                         )}
                         {appointment.status === 'confirmed' && (
-                          <div className="flex space-x-1">
+                          <div className="flex flex-wrap gap-1">
                             <button 
                               onClick={() => handleJoinSession(appointment)}
                               className="text-blue-600 hover:text-blue-900 text-xs px-2 py-1 border border-blue-200 rounded hover:bg-blue-50"
                             >
-                              {appointment.mode === 'video' && '📹 Join'}
-                              {appointment.mode === 'tele' && '💬 Chat'}
+                              {appointment.mode === 'video' && '📹 Video'}
+                              {appointment.mode === 'tele' && '💬 Chat/Online'}
                               {appointment.mode === 'in-person' && '🏢 Prepare'}
+                            </button>
+                            <button 
+                              onClick={() => handleOpenCompleteForm(appointment)}
+                              className="text-green-600 hover:text-green-900 text-xs px-2 py-1 border border-green-200 rounded hover:bg-green-50"
+                            >
+                              ✓ Finish session
                             </button>
                             <button 
                               onClick={() => handleCancelAppointment(appointment._id || appointment.id)}
@@ -749,10 +771,10 @@ const AppointmentsTab = () => {
                             </button>
                           </div>
                         )}
-                        {appointment.status === 'completed' && (
-                          <button className="text-gray-600 hover:text-gray-900 text-xs px-2 py-1 border border-gray-200 rounded hover:bg-gray-50">
-                            📄 View Report
-                          </button>
+                        {appointment.status === 'completed' && (appointment.sessionRiskLevel || appointment.sessionSummary) && (
+                          <span className="text-xs text-gray-500" title={appointment.sessionSummary || ''}>
+                            {appointment.sessionRiskLevel || '—'} • Report saved
+                          </span>
                         )}
                         {(appointment.status === 'cancelled' || appointment.status === 'pending') && (
                           <span className="text-gray-400 text-xs">No actions</span>
@@ -763,6 +785,48 @@ const AppointmentsTab = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Complete Session modal (risk level + description, like risk dashboard) */}
+      {completeSessionAppointment && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Complete session</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Student: <strong>{completeSessionAppointment.studentId?.name || '—'}</strong>. Add a risk level and summary for this session.
+            </p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Session risk level</label>
+                <select
+                  value={completeForm.sessionRiskLevel}
+                  onChange={(e) => setCompleteForm({ ...completeForm, sessionRiskLevel: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="critical">Critical</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Description / summary</label>
+                <textarea
+                  value={completeForm.sessionSummary}
+                  onChange={(e) => setCompleteForm({ ...completeForm, sessionSummary: e.target.value })}
+                  placeholder="Brief notes about the session and any follow-up..."
+                  rows={4}
+                  maxLength={2000}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <button type="button" onClick={() => setCompleteSessionAppointment(null)} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancel</button>
+              <button type="button" onClick={handleSubmitCompleteSession} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Complete & save report</button>
+            </div>
           </div>
         </div>
       )}
@@ -851,32 +915,67 @@ const AvailabilityTab = () => {
   )
 }
 
-// Session Reports Tab
+// Session Reports Tab – completed sessions with risk level and description (admin can see these too)
 const ReportsTab = () => {
+  const { callApi } = useApi()
+  const [completed, setCompleted] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    const run = async () => {
+      setLoading(true)
+      try {
+        const res = await callApi('/api/v1/appointments/me?includeCompleted=true', 'GET')
+        if (!cancelled && res.success && res.data) {
+          const list = res.data?.appointments ?? (Array.isArray(res.data) ? res.data : [])
+          setCompleted(list.filter(a => a.status === 'completed').sort((a, b) => new Date(b.slotStart) - new Date(a.slotStart)))
+        }
+      } catch (_) {}
+      if (!cancelled) setLoading(false)
+    }
+    run()
+    return () => { cancelled = true }
+  }, [callApi])
+
+  const riskColors = { low: 'bg-green-100 text-green-800', medium: 'bg-yellow-100 text-yellow-800', high: 'bg-orange-100 text-orange-800', critical: 'bg-red-100 text-red-800' }
+
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold text-gray-900">Session Reports</h2>
-        <p className="text-gray-600">Submit and manage session reports for completed appointments</p>
+        <p className="text-gray-600">Completed sessions with risk level and description. Admin can view these details and see users by name.</p>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Pending Reports</h3>
-        <p className="text-gray-600">You have 3 session reports that need to be completed.</p>
-        
-        <div className="mt-4 space-y-3">
-          {[1, 2, 3].map((report) => (
-            <div key={report} className="flex items-center justify-between p-4 border rounded-lg">
-              <div>
-                <p className="font-medium text-gray-900">Session #{report}</p>
-                <p className="text-sm text-gray-500">Student #123{report} - {new Date().toLocaleDateString()}</p>
-              </div>
-              <button className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700">
-                Submit Report
-              </button>
-            </div>
-          ))}
-        </div>
+      <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+        {loading ? (
+          <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-10 w-10 border-2 border-green-600 border-t-transparent" /></div>
+        ) : completed.length === 0 ? (
+          <div className="p-8 text-center text-gray-500">No completed sessions yet. Finish a session from the Appointments tab to add a report.</div>
+        ) : (
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Level</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Summary</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {completed.map((apt) => (
+                <tr key={apt._id}>
+                  <td className="px-6 py-3 text-sm font-medium text-gray-900">{apt.studentId?.name ?? '—'}</td>
+                  <td className="px-6 py-3 text-sm text-gray-600">{apt.slotStart ? new Date(apt.slotStart).toLocaleString() : '—'}</td>
+                  <td className="px-6 py-3">
+                    {apt.sessionRiskLevel ? <span className={`px-2 py-0.5 rounded text-xs font-medium ${riskColors[apt.sessionRiskLevel] || ''}`}>{apt.sessionRiskLevel}</span> : '—'}
+                  </td>
+                  <td className="px-6 py-3 text-sm text-gray-600 max-w-md">{apt.sessionSummary || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   )

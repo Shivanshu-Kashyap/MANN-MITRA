@@ -117,6 +117,30 @@ const appointmentSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  // Session completion (counsellor post-session form, like risk dashboard)
+  completedAt: {
+    type: Date,
+    default: null
+  },
+  completedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  sessionRiskLevel: {
+    type: String,
+    enum: {
+      values: ['low', 'medium', 'high', 'critical'],
+      message: 'Session risk level must be low, medium, high, or critical'
+    },
+    default: null
+  },
+  sessionSummary: {
+    type: String,
+    maxlength: [2000, 'Session summary cannot exceed 2000 characters'],
+    trim: true,
+    default: null
+  },
   // Reminder settings
   reminderSent: {
     type: Boolean,
@@ -290,8 +314,12 @@ appointmentSchema.methods.confirm = async function(confirmedBy) {
 };
 
 // Instance method to complete appointment
-appointmentSchema.methods.complete = async function() {
+appointmentSchema.methods.complete = async function(completedBy = null, sessionRiskLevel = null, sessionSummary = null) {
   this.status = 'completed';
+  this.completedAt = new Date();
+  if (completedBy) this.completedBy = completedBy;
+  if (sessionRiskLevel) this.sessionRiskLevel = sessionRiskLevel;
+  if (sessionSummary) this.sessionSummary = sessionSummary;
   return await this.save();
 };
 

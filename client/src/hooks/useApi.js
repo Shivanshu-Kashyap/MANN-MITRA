@@ -18,8 +18,8 @@ export const useApi = () => {
         ...options,
       };
 
-      // Add authorization header if token exists
-      const token = localStorage.getItem('Mann-Mitra_token') || sessionStorage.getItem('Mann-Mitra_token');
+      // Add authorization header if token exists (admin uses 'token', others use 'Mann-Mitra_token')
+      const token = localStorage.getItem('Mann-Mitra_token') || sessionStorage.getItem('Mann-Mitra_token') || localStorage.getItem('token') || sessionStorage.getItem('token');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }

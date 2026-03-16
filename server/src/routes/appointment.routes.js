@@ -100,6 +100,15 @@ const statusUpdateValidation = [
     .optional()
     .isLength({ max: 100 })
     .withMessage('Meeting ID cannot exceed 100 characters')
+    .trim(),
+  body('sessionRiskLevel')
+    .optional()
+    .isIn(['low', 'medium', 'high', 'critical'])
+    .withMessage('Session risk level must be low, medium, high, or critical'),
+  body('sessionSummary')
+    .optional()
+    .isLength({ max: 2000 })
+    .withMessage('Session summary cannot exceed 2000 characters')
     .trim()
 ];
 
