@@ -64,6 +64,10 @@ class DocumentLoader:
         for i, chunk in enumerate(chunks):
             severity = self._detect_severity_category(chunk)
             topic = self._detect_topic(chunk)
+            if topic == "general" and source and (source.endswith(".pdf") or "/" in source or "\\" in source):
+                filename_topic = self._topic_from_filename(source)
+                if filename_topic:
+                    topic = filename_topic
 
             meta = {
                 "source": source,
@@ -90,16 +94,21 @@ class DocumentLoader:
         """Heuristic severity tagger based on content keywords."""
         lower = text.lower()
         critical_kw = [
-            "suicide", "suicidal", "self-harm", "crisis intervention",
-            "emergency", "overdose", "lethal means",
+            "suicide", "suicidal", "self-harm", "self harm", "crisis intervention",
+            "emergency", "overdose", "lethal means", "warning signs of suicide",
+            "action steps help someone", "988", "crisis lifeline", "crisis hotline",
+            "thoughts of suicide", "suicidal ideation", "frequently asked questions about suicide",
         ]
         high_kw = [
             "severe depression", "severe anxiety", "psychosis",
-            "hospitalization", "inpatient",
+            "hospitalization", "inpatient", "panic disorder", "panic attack",
+            "ptsd", "trauma", "substance abuse", "substance use", "addiction",
+            "personality disorder", "borderline", "bpd",
         ]
         medium_kw = [
             "moderate depression", "panic attack", "ptsd",
-            "trauma", "substance abuse",
+            "trauma", "substance abuse", "drug use", "preventing drug",
+            "generalized anxiety", "social anxiety", "phobia",
         ]
 
         if any(k in lower for k in critical_kw):
@@ -112,21 +121,81 @@ class DocumentLoader:
 
     @staticmethod
     def _detect_topic(text: str) -> str:
+        """Map content to topic for retrieval; covers all knowledge base criteria."""
         lower = text.lower()
         topic_map = {
-            "cbt": ["cognitive behavioral", "cbt", "thought patterns", "cognitive distortion"],
-            "anxiety": ["anxiety", "anxious", "worry", "panic", "gad"],
-            "depression": ["depression", "depressed", "hopeless", "sadness", "phq"],
-            "stress": ["stress", "burnout", "overwhelm", "pressure"],
-            "crisis": ["crisis", "suicide", "self-harm", "emergency"],
-            "mindfulness": ["mindfulness", "meditation", "breathing", "grounding"],
-            "self_care": ["self-care", "sleep", "exercise", "nutrition", "hygiene"],
-            "relationships": ["relationship", "social", "loneliness", "isolation"],
+            "crisis": [
+                "suicide", "suicidal", "self-harm", "self harm", "crisis", "emergency",
+                "warning signs", "action steps", "988", "crisis lifeline", "lethal means",
+                "frequently asked questions about suicide",
+            ],
+            "cbt": [
+                "cognitive behavioral", "cbt", "thought patterns", "cognitive distortion",
+                "behavioral therapy", "cognitive restructuring", "automatic thoughts",
+            ],
+            "anxiety": [
+                "anxiety", "anxious", "worry", "panic", "gad", "panic attack",
+                "panic disorder", "generalized anxiety", "social anxiety", "phobia",
+            ],
+            "depression": [
+                "depression", "depressed", "hopeless", "sadness", "phq", "mood",
+                "low mood", "major depressive", "depressive disorder",
+            ],
+            "stress": [
+                "stress", "stressed", "burnout", "overwhelm", "pressure",
+                "coping with stress", "stress management", "stressed out",
+            ],
+            "substance_use": [
+                "substance", "drug use", "drug abuse", "alcohol", "addiction",
+                "preventing drug", "substance use disorder", "recovery",
+            ],
+            "personality_disorders": [
+                "personality disorder", "borderline", "bpd", "narcissistic",
+                "avoidant", "dependent", "cluster", "dialectical",
+            ],
+            "mindfulness": [
+                "mindfulness", "meditation", "breathing", "grounding",
+                "relaxation", "coloring", "activity book", "calm",
+            ],
+            "self_care": [
+                "self-care", "self care", "sleep", "exercise", "nutrition",
+                "hygiene", "routine", "healthy habits", "wellness",
+            ],
+            "relationships": [
+                "relationship", "social", "loneliness", "isolation",
+                "support system", "connection", "interpersonal",
+            ],
+            "mental_health_general": [
+                "mental health", "wellbeing", "well-being", "psychological",
+                "emotional health", "counseling", "therapy", "treatment",
+            ],
         }
         for topic, keywords in topic_map.items():
             if any(k in lower for k in keywords):
                 return topic
         return "general"
+
+    @staticmethod
+    def _topic_from_filename(file_path: str) -> Optional[str]:
+        """Infer topic from filename for better metadata (e.g. database PDFs)."""
+        name = Path(file_path).stem.lower()
+        if "suicide" in name or "suicid" in name or "crisis" in name:
+            return "crisis"
+        if "depression" in name or "depress" in name:
+            return "depression"
+        if "anxiety" in name or "panic" in name:
+            return "anxiety"
+        if "stress" in name or "stressed" in name:
+            return "stress"
+        if "cbt" in name or "cognitive" in name:
+            return "cbt"
+        if "personality" in name or "disorder" in name:
+            return "personality_disorders"
+        if "drug" in name or "substance" in name or "preventing" in name:
+            return "substance_use"
+        if "mental" in name and "health" in name:
+            return "mental_health_general"
+        return None
 
 
 document_loader = DocumentLoader()

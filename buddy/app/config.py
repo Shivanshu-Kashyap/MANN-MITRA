@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-2.0-flash"
     EMBEDDING_MODEL: str = "gemini-embedding-001"
+    # gemini = cloud embeddings (slow on free tier, rate limits). local = SentenceTransformer (fast, offline).
+    # Use "local" for seeding large PDF sets; queries must use the same backend as when data was indexed.
+    EMBEDDING_BACKEND: str = "auto"  # auto | gemini | local
 
     CHROMA_PERSIST_DIR: str = "./chroma_db"
     CHROMA_COLLECTION_NAME: str = "mental_health_kb"
@@ -39,6 +42,16 @@ class Settings(BaseSettings):
     @property
     def has_gemini(self) -> bool:
         return bool(self.GEMINI_API_KEY)
+
+    @property
+    def use_local_embeddings(self) -> bool:
+        b = (self.EMBEDDING_BACKEND or "auto").lower().strip()
+        if b == "local":
+            return True
+        if b == "gemini":
+            return False
+        # auto: Gemini when API key set, else local SentenceTransformer
+        return not self.has_gemini
 
 
 settings = Settings()

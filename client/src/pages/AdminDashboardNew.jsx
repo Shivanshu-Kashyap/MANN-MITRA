@@ -207,7 +207,7 @@ const AdminDashboardNew = () => {
         {activeTab === 'peer-approval' && <PeerApprovalTab />}
         {activeTab === 'students' && <StudentAnalyticsTab />}
         {activeTab === 'crisis' && <CrisisManagementTab />}
-        {activeTab === 'reports' && <ReportsTab />}
+        {activeTab === 'reports' && <ReportsTab callApi={callApi} />}
         {activeTab === 'courses' && <CourseManagementTab />}
       </div>
     </div>
@@ -1365,87 +1365,211 @@ const CrisisManagementTab = () => {
   )
 }
 
-// Enhanced Reports Tab Component (No changes needed, already uses local state)
-const ReportsTab = () => {
+// Reports tab — live data from /api/v1/admin/reports/export
+const ReportsTab = ({ callApi }) => {
   const [selectedReportType, setSelectedReportType] = useState('mental-health')
   const [dateRange, setDateRange] = useState('last-30-days')
+  const [customStart, setCustomStart] = useState('')
+  const [customEnd, setCustomEnd] = useState('')
+  const [reportRows, setReportRows] = useState([])
+  const [crisisBundle, setCrisisBundle] = useState(null)
+  const [loadedApiType, setLoadedApiType] = useState(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [reportError, setReportError] = useState('')
+  const [filterTool, setFilterTool] = useState('all')
+  const [filterSeverity, setFilterSeverity] = useState('all')
+  const [searchText, setSearchText] = useState('')
 
   const reportTypes = [
-    { id: 'mental-health', name: 'Mental Health Levels Report' },
-    { id: 'chatbot', name: 'Chatbot Interaction Report' },
-    { id: 'peer-talk', name: 'Peer Talk Sessions Report' },
-    { id: 'courses', name: 'Course Completion Report' },
-    { id: 'crisis', name: 'Crisis Intervention Report' },
-    { id: 'overall', name: 'Overall Platform Analytics' }
+    { id: 'mental-health', name: 'Screenings (PHQ-9 / GAD-7)', apiType: 'screenings', hint: 'Scores & triage (no raw answers)' },
+    { id: 'crisis', name: 'Crisis intervention', apiType: 'crisis', hint: 'High-risk screenings + flagged forum posts' },
+    { id: 'appointments', name: 'Appointments', apiType: 'appointments', hint: 'Bookings in date range' },
+    { id: 'forum', name: 'Forum (metadata)', apiType: 'forum', hint: 'Titles & status (body excluded)' },
+    { id: 'users', name: 'Users', apiType: 'users', hint: 'Registrations in range' },
+    { id: 'chatbot', name: 'Buddy / chatbot', apiType: null, hint: 'Use the Risk Dashboard tab for live Buddy metrics' },
   ]
 
-  const sampleReports = {
-    'mental-health': {
-      title: 'Mental Health Levels Report',
-      data: [
-        { category: 'Excellent Mental Health', count: 852, percentage: 30 },
-        { category: 'Good Mental Health', count: 1138, percentage: 40 },
-        { category: 'Fair Mental Health', count: 569, percentage: 20 },
-        { category: 'Poor Mental Health', count: 284, percentage: 10 },
-      ]
-    },
-    'chatbot': {
-      title: 'Chatbot Buddy Interaction Report',
-      data: [
-        { metric: 'Total Conversations', value: '15,432' },
-        { metric: 'Average Session Duration', value: '12m 34s' },
-        { metric: 'Most Common Topics', value: 'Stress (34%), Anxiety (28%), Study Issues (22%)' },
-        { metric: 'Satisfaction Rate', value: '89%' },
-        { metric: 'Crisis Escalations', value: '23' }
-      ]
-    },
-    'peer-talk': {
-      title: 'Peer Talk Sessions Report', 
-      data: [
-        { metric: 'Total Sessions Conducted', value: '1,247' },
-        { metric: 'Active Peer Counselors', value: '23' },
-        { metric: 'Average Session Duration', value: '45 minutes' },
-        { metric: 'Student Satisfaction', value: '92%' },
-        { metric: 'Successful Resolutions', value: '78%' }
-      ]
-    },
-    'courses': {
-      title: 'Course Completion Report',
-      data: [
-        { course: 'Stress Management Techniques', enrolled: 456, completed: 324, rate: 71 },
-        { course: 'Mindfulness and Meditation', enrolled: 389, completed: 298, rate: 77 },
-        { course: 'Anxiety Coping Strategies', enrolled: 234, completed: 167, rate: 71 },
-        { course: 'Study Skills & Time Management', enrolled: 345, completed: 289, rate: 84 },
-        { course: 'Building Resilience', enrolled: 278, completed: 201, rate: 72 }
-      ]
+  const reportPeriodMap = {
+    'last-7-days': 7,
+    'last-30-days': 30,
+    'last-90-days': 90,
+    'last-year': 365,
+  }
+
+  const selectedMeta = reportTypes.find((t) => t.id === selectedReportType)
+
+  const buildQueryString = (apiType) => {
+    const params = new URLSearchParams()
+    params.set('type', apiType)
+    params.set('format', 'json')
+    if (dateRange === 'custom' && customStart && customEnd) {
+      params.set('startDate', new Date(customStart).toISOString())
+      params.set('endDate', new Date(customEnd).toISOString())
+    } else {
+      params.set('period', String(reportPeriodMap[dateRange] || 30))
+    }
+    return params.toString()
+  }
+
+  const generateReport = async () => {
+    const apiType = selectedMeta?.apiType
+    if (!apiType) {
+      setReportError(null)
+      setReportRows([])
+      setCrisisBundle(null)
+      setLoadedApiType(null)
+      return
+    }
+    if (dateRange === 'custom' && (!customStart || !customEnd)) {
+      setReportError('Please choose both start and end dates for a custom range.')
+      return
+    }
+    setIsLoading(true)
+    setReportError('')
+    setReportRows([])
+    setCrisisBundle(null)
+    setLoadedApiType(null)
+    try {
+      const qs = buildQueryString(apiType)
+      const result = await callApi(`/api/v1/admin/reports/export?${qs}`, 'GET')
+      if (!result.success) {
+        setReportError(result.error || 'Failed to generate report')
+        return
+      }
+      const payload = result.data
+      if (apiType === 'crisis' && payload && typeof payload === 'object' && !Array.isArray(payload) && payload.crisisScreenings) {
+        setCrisisBundle(payload)
+        setLoadedApiType('crisis')
+      } else if (Array.isArray(payload)) {
+        setReportRows(payload)
+        setLoadedApiType(apiType)
+      } else {
+        setReportRows([])
+        setReportError('Unexpected report shape from server.')
+      }
+    } catch (err) {
+      setReportError(err.message || 'Failed to generate report')
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  const generateReport = () => {
-    // Simulate report generation
-    alert(`Generating ${reportTypes.find(r => r.id === selectedReportType)?.name} for ${dateRange}...`)
-  }
+  const filteredScreenings = reportRows.filter((row) => {
+    if (loadedApiType !== 'screenings') return true
+    if (filterTool !== 'all' && row.tool !== filterTool) return false
+    if (filterSeverity !== 'all' && (row.severity || '') !== filterSeverity) return false
+    if (searchText.trim()) {
+      const q = searchText.toLowerCase()
+      const name = (row.studentId?.name || '').toLowerCase()
+      const email = (row.studentId?.email || '').toLowerCase()
+      if (!name.includes(q) && !email.includes(q)) return false
+    }
+    return true
+  })
+
+  const filteredGeneric = reportRows.filter((row) => {
+    if (!searchText.trim()) return true
+    const q = searchText.toLowerCase()
+    return JSON.stringify(row).toLowerCase().includes(q)
+  })
+
+  const rowsForTable = loadedApiType === 'screenings' ? filteredScreenings : filteredGeneric
+
+  const hasCrisisData = crisisBundle && (crisisBundle.crisisScreenings?.length || crisisBundle.crisisForumPosts?.length)
 
   const exportReport = (format) => {
-    alert(`Exporting report as ${format.toUpperCase()}...`)
+    if (format !== 'csv') return
+    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
+    let csvRows = []
+    if (loadedApiType === 'crisis' && crisisBundle) {
+      csvRows = [
+        ['Section', 'Student', 'Detail', 'Created'],
+        ...(crisisBundle.crisisScreenings || []).map((row) => [
+          'Screening',
+          row.studentId?.name || 'Anonymous',
+          `${row.tool} score ${row.score} ${row.severity}`,
+          row.createdAt ? new Date(row.createdAt).toLocaleString() : '',
+        ]),
+        ...(crisisBundle.crisisForumPosts || []).map((row) => [
+          'Forum',
+          row.studentId?.name || 'Anonymous',
+          row.title || row.status || '',
+          row.createdAt ? new Date(row.createdAt).toLocaleString() : '',
+        ]),
+      ]
+    } else if (loadedApiType === 'screenings') {
+      csvRows = [
+        ['Student', 'Email', 'Tool', 'Score', 'Severity', 'Triage', 'Created'],
+        ...rowsForTable.map((row) => [
+          row.studentId?.name || 'Anonymous',
+          row.studentId?.email || '',
+          row.tool || '',
+          row.score ?? '',
+          row.severity || '',
+          row.triageAction || '',
+          row.createdAt ? new Date(row.createdAt).toLocaleString() : '',
+        ]),
+      ]
+    } else if (loadedApiType === 'appointments') {
+      csvRows = [
+        ['Student', 'Counsellor', 'Status', 'Slot start'],
+        ...rowsForTable.map((row) => [
+          row.studentId?.name || '',
+          row.counsellorId?.name || '',
+          row.status || '',
+          row.slotStart ? new Date(row.slotStart).toLocaleString() : '',
+        ]),
+      ]
+    } else if (loadedApiType === 'forum') {
+      csvRows = [
+        ['Student', 'Title', 'Status', 'Created'],
+        ...rowsForTable.map((row) => [
+          row.studentId?.name || 'Anonymous',
+          row.title || '',
+          row.status || '',
+          row.createdAt ? new Date(row.createdAt).toLocaleString() : '',
+        ]),
+      ]
+    } else if (loadedApiType === 'users') {
+      csvRows = [
+        ['Name', 'Email', 'Role', 'Created'],
+        ...rowsForTable.map((row) => [
+          row.name || '',
+          row.email || '',
+          row.role || '',
+          row.createdAt ? new Date(row.createdAt).toLocaleString() : '',
+        ]),
+      ]
+    }
+    if (!csvRows.length) return
+    const csvContent = csvRows.map((r) => r.map(esc).join(',')).join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `report-${loadedApiType || 'export'}-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
   }
+
+  const canExportCsv = loadedApiType && (rowsForTable.length > 0 || hasCrisisData)
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-xl font-semibold text-[#2A3F47]">Reports & Analytics</h2>
-          <p className="text-gray-600">Generate comprehensive reports on platform usage and student well-being</p>
+          <p className="text-gray-600">Pull live data from the server (admin only).</p>
         </div>
       </div>
 
-      {/* Report Type Selection */}
       <div className="bg-white rounded-lg shadow-sm border p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Select Report Type</h3>
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Report type</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {reportTypes.map((type) => (
             <button
               key={type.id}
+              type="button"
               onClick={() => setSelectedReportType(type.id)}
               className={`p-4 rounded-xl border-2 text-left transition-all ${
                 selectedReportType === type.id
@@ -1453,124 +1577,344 @@ const ReportsTab = () => {
                   : 'border-gray-200 hover:border-gray-300'
               }`}
             >
-              <span className="font-medium text-gray-900">{type.name}</span>
+              <span className="font-medium text-gray-900 block">{type.name}</span>
+              <span className="text-xs text-gray-500 mt-1 block">{type.hint}</span>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Date Range & Controls */}
-      <div className="bg-white rounded-lg shadow-sm border p-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
-            <select
-              value={dateRange}
-              onChange={(e) => setDateRange(e.target.value)}
-              className="border border-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-700"
-            >
-              <option value="last-7-days">Last 7 Days</option>
-              <option value="last-30-days">Last 30 Days</option>
-              <option value="last-90-days">Last 90 Days</option>
-              <option value="last-year">Last Year</option>
-              <option value="custom">Custom Range</option>
-            </select>
+      <div className="bg-white rounded-lg shadow-sm border p-6 space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+          <div className="flex flex-wrap gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Date range</label>
+              <select
+                value={dateRange}
+                onChange={(e) => setDateRange(e.target.value)}
+                className="border border-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-700"
+              >
+                <option value="last-7-days">Last 7 days</option>
+                <option value="last-30-days">Last 30 days</option>
+                <option value="last-90-days">Last 90 days</option>
+                <option value="last-year">Last year</option>
+                <option value="custom">Custom (ISO dates)</option>
+              </select>
+            </div>
+            {dateRange === 'custom' && (
+              <div className="flex flex-wrap gap-3 items-end">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Start</label>
+                  <input
+                    type="date"
+                    value={customStart}
+                    onChange={(e) => setCustomStart(e.target.value)}
+                    className="border border-gray-300 rounded-xl px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">End</label>
+                  <input
+                    type="date"
+                    value={customEnd}
+                    onChange={(e) => setCustomEnd(e.target.value)}
+                    className="border border-gray-300 rounded-xl px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+            )}
           </div>
-          
-          <div className="flex space-x-3">
+          <div className="flex flex-wrap gap-3">
             <button
+              type="button"
               onClick={generateReport}
-              className="bg-teal-800 text-white px-4 py-2 rounded-xl hover:bg-teal-900 font-medium"
+              disabled={!selectedMeta?.apiType || isLoading}
+              className="bg-teal-800 text-white px-4 py-2 rounded-xl hover:bg-teal-900 font-medium disabled:opacity-50"
             >
-              Generate Report
+              {isLoading ? 'Loading…' : 'Generate report'}
             </button>
             <button
-              onClick={() => exportReport('pdf')}
-              className="bg-emerald-600 text-white px-4 py-2 rounded-xl hover:bg-emerald-700 font-medium"
+              type="button"
+              disabled
+              title="PDF export not implemented on server yet"
+              className="bg-gray-200 text-gray-500 px-4 py-2 rounded-xl font-medium cursor-not-allowed"
             >
-              Export PDF
+              Export PDF (soon)
             </button>
             <button
+              type="button"
               onClick={() => exportReport('csv')}
-              className="bg-gray-600 text-white px-4 py-2 rounded-xl hover:bg-gray-700 font-medium"
+              disabled={!canExportCsv}
+              className="bg-gray-700 text-white px-4 py-2 rounded-xl hover:bg-gray-800 font-medium disabled:opacity-50"
             >
               Export CSV
             </button>
           </div>
         </div>
+
+        {loadedApiType === 'screenings' && reportRows.length > 0 && (
+          <div className="flex flex-wrap gap-3 pt-2 border-t border-gray-100">
+            <input
+              type="search"
+              placeholder="Search student name or email…"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className="border border-gray-300 rounded-xl px-3 py-2 text-sm flex-1 min-w-[200px]"
+            />
+            <select
+              value={filterTool}
+              onChange={(e) => setFilterTool(e.target.value)}
+              className="border border-gray-300 rounded-xl px-3 py-2 text-sm"
+            >
+              <option value="all">All tools</option>
+              <option value="PHQ-9">PHQ-9</option>
+              <option value="GAD-7">GAD-7</option>
+            </select>
+            <select
+              value={filterSeverity}
+              onChange={(e) => setFilterSeverity(e.target.value)}
+              className="border border-gray-300 rounded-xl px-3 py-2 text-sm"
+            >
+              <option value="all">All severity</option>
+              {['Minimal', 'Mild', 'Moderate', 'Moderately severe', 'Severe'].map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {loadedApiType && loadedApiType !== 'screenings' && loadedApiType !== 'crisis' && reportRows.length > 0 && (
+          <div className="pt-2 border-t border-gray-100">
+            <input
+              type="search"
+              placeholder="Filter rows (any field)…"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className="border border-gray-300 rounded-xl px-3 py-2 text-sm w-full max-w-md"
+            />
+          </div>
+        )}
       </div>
 
-      {/* Report Preview */}
       <div className="bg-white rounded-lg shadow-sm border">
         <div className="p-6 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">
-            {sampleReports[selectedReportType]?.title || 'Report Preview'}
-          </h3>
-          <p className="text-sm text-gray-600 mt-1">Data for {dateRange}</p>
+          <h3 className="text-lg font-medium text-gray-900">Preview</h3>
+          <p className="text-sm text-gray-600 mt-1">
+            {selectedMeta?.name || 'Report'} — {dateRange === 'custom' ? `${customStart || '…'} → ${customEnd || '…'}` : dateRange.replace(/-/g, ' ')}
+          </p>
         </div>
-        
+
         <div className="p-6">
-          {selectedReportType === 'mental-health' && (
-            <div className="space-y-4">
-              {sampleReports['mental-health'].data.map((item, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <span className="font-medium">{item.category}</span>
-                  <div className="flex items-center space-x-4">
-                    <span className="text-gray-600">{item.count} students</span>
-                    <span className="font-bold text-blue-600">{item.percentage}%</span>
-                  </div>
-                </div>
-              ))}
+          {!selectedMeta?.apiType && (
+            <div className="text-center py-8 text-gray-500">
+              Select a report with API support and click <strong>Generate report</strong>. For Buddy chatbot analytics, open the <strong>Risk Dashboard</strong> tab.
             </div>
           )}
-          
-          {selectedReportType === 'chatbot' && (
-            <div className="space-y-4">
-              {sampleReports['chatbot'].data.map((item, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <span className="font-medium">{item.metric}</span>
-                  <span className="font-bold text-green-600">{item.value}</span>
+          {selectedMeta?.apiType && isLoading && (
+            <div className="text-center py-8 text-gray-500">Generating report…</div>
+          )}
+          {reportError && (
+            <div className="bg-red-50 text-red-700 border border-red-200 rounded-lg p-4">{reportError}</div>
+          )}
+          {!isLoading && !reportError && selectedMeta?.apiType && loadedApiType === 'crisis' && crisisBundle && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-rose-50 border border-rose-100 rounded-xl p-4">
+                  <p className="text-xs text-rose-600 font-medium uppercase">High-risk screenings</p>
+                  <p className="text-2xl font-bold text-rose-800">{crisisBundle.summary?.totalCrisisScreenings ?? 0}</p>
                 </div>
-              ))}
+                <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+                  <p className="text-xs text-amber-700 font-medium uppercase">Forum flags (self-harm)</p>
+                  <p className="text-2xl font-bold text-amber-900">{crisisBundle.summary?.totalCrisisForumPosts ?? 0}</p>
+                </div>
+                <div className="bg-gray-50 border border-gray-100 rounded-xl p-4">
+                  <p className="text-xs text-gray-500 font-medium uppercase">Total crisis rows</p>
+                  <p className="text-2xl font-bold text-gray-800">{crisisBundle.summary?.totalCrisisAlerts ?? 0}</p>
+                </div>
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-2">Screenings</h4>
+                <div className="overflow-x-auto border rounded-lg">
+                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tool</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Score</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Severity</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {(crisisBundle.crisisScreenings || []).length === 0 ? (
+                        <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-400">None in this range</td></tr>
+                      ) : (
+                        crisisBundle.crisisScreenings.map((row) => (
+                          <tr key={row._id}>
+                            <td className="px-4 py-2">{row.studentId?.name || 'Anonymous'}</td>
+                            <td className="px-4 py-2">{row.tool}</td>
+                            <td className="px-4 py-2">{row.score}</td>
+                            <td className="px-4 py-2">{row.severity}</td>
+                            <td className="px-4 py-2">{row.createdAt ? new Date(row.createdAt).toLocaleString() : '—'}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-2">Forum posts (flagged)</h4>
+                <div className="overflow-x-auto border rounded-lg">
+                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {(crisisBundle.crisisForumPosts || []).length === 0 ? (
+                        <tr><td colSpan={4} className="px-4 py-6 text-center text-gray-400">None in this range</td></tr>
+                      ) : (
+                        crisisBundle.crisisForumPosts.map((row) => (
+                          <tr key={row._id}>
+                            <td className="px-4 py-2">{row.studentId?.name || 'Anonymous'}</td>
+                            <td className="px-4 py-2 max-w-xs truncate" title={row.title}>{row.title}</td>
+                            <td className="px-4 py-2">{row.status}</td>
+                            <td className="px-4 py-2">{row.createdAt ? new Date(row.createdAt).toLocaleString() : '—'}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           )}
-          
-          {selectedReportType === 'peer-talk' && (
-            <div className="space-y-4">
-              {sampleReports['peer-talk'].data.map((item, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <span className="font-medium">{item.metric}</span>
-                  <span className="font-bold text-purple-600">{item.value}</span>
-                </div>
-              ))}
-            </div>
-          )}
-          
-          {selectedReportType === 'courses' && (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Course</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Enrolled</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Completed</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rate</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {sampleReports['courses'].data.map((course, index) => (
-                    <tr key={index}>
-                      <td className="px-4 py-4 text-sm font-medium text-gray-900">{course.course}</td>
-                      <td className="px-4 py-4 text-sm text-gray-500">{course.enrolled}</td>
-                      <td className="px-4 py-4 text-sm text-gray-500">{course.completed}</td>
-                      <td className="px-4 py-4 text-sm">
-                        <span className="font-bold text-green-600">{course.rate}%</span>
-                      </td>
+
+          {!isLoading && !reportError && loadedApiType === 'screenings' && (
+            rowsForTable.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                {reportRows.length === 0 ? 'No rows in this range. Generate again after new screenings.' : 'No rows match filters.'}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tool</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Score</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Severity</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Triage</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {rowsForTable.map((row, index) => (
+                      <tr key={row._id || index}>
+                        <td className="px-4 py-4 text-sm font-medium text-gray-900">{row.studentId?.name || 'Anonymous'}</td>
+                        <td className="px-4 py-4 text-sm text-gray-500">{row.tool}</td>
+                        <td className="px-4 py-4 text-sm text-gray-500">{row.score}</td>
+                        <td className="px-4 py-4 text-sm text-gray-500">{row.severity}</td>
+                        <td className="px-4 py-4 text-sm text-gray-500">{row.triageAction}</td>
+                        <td className="px-4 py-4 text-sm text-gray-500">{row.createdAt ? new Date(row.createdAt).toLocaleString() : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          )}
+
+          {!isLoading && !reportError && loadedApiType === 'appointments' && (
+            rowsForTable.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">No appointments in this range.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Counsellor</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Slot</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {rowsForTable.map((row) => (
+                      <tr key={row._id}>
+                        <td className="px-4 py-3">{row.studentId?.name || '—'}</td>
+                        <td className="px-4 py-3">{row.counsellorId?.name || '—'}</td>
+                        <td className="px-4 py-3">{row.status}</td>
+                        <td className="px-4 py-3">{row.slotStart ? new Date(row.slotStart).toLocaleString() : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          )}
+
+          {!isLoading && !reportError && loadedApiType === 'forum' && (
+            rowsForTable.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">No forum rows in this range.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {rowsForTable.map((row) => (
+                      <tr key={row._id}>
+                        <td className="px-4 py-3">{row.studentId?.name || 'Anonymous'}</td>
+                        <td className="px-4 py-3 max-w-md truncate" title={row.title}>{row.title}</td>
+                        <td className="px-4 py-3">{row.status}</td>
+                        <td className="px-4 py-3">{row.createdAt ? new Date(row.createdAt).toLocaleString() : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          )}
+
+          {!isLoading && !reportError && loadedApiType === 'users' && (
+            rowsForTable.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">No users in this range.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {rowsForTable.map((row) => (
+                      <tr key={row._id}>
+                        <td className="px-4 py-3">{row.name}</td>
+                        <td className="px-4 py-3">{row.email}</td>
+                        <td className="px-4 py-3">{row.role}</td>
+                        <td className="px-4 py-3">{row.createdAt ? new Date(row.createdAt).toLocaleString() : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
           )}
         </div>
       </div>

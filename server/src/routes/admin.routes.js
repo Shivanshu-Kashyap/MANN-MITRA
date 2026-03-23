@@ -183,7 +183,7 @@ router.get(
       switch (type) {
         case 'screenings':
           data = await require('../models/screening.model').find(dateFilter)
-            .populate('userId', 'name email collegeId')
+            .populate('studentId', 'name email collegeId')
             .select('-responses') // Exclude sensitive response data
             .lean();
           filename = `screenings_report_${new Date().toISOString().split('T')[0]}`;
@@ -217,10 +217,9 @@ router.get(
           const [crisisScreenings, crisisForumPosts] = await Promise.all([
             require('../models/screening.model').find({
               ...dateFilter,
-              riskLevel: 'high',
-              isCrisisAlert: true
+              isHighRisk: true
             })
-            .populate('userId', 'name email collegeId')
+            .populate('studentId', 'name email collegeId')
             .select('-responses')
             .lean(),
             

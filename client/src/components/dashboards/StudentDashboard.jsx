@@ -17,10 +17,41 @@ const StudentDashboard = () => {
   const [latestAppointment, setLatestAppointment] = useState(null)
   const [loading, setLoading] = useState(true)
   const [confirmedAppointments, setConfirmedAppointments] = useState([])
+  const [latestScreening, setLatestScreening] = useState(null)
+  const [wellnessPlan, setWellnessPlan] = useState([])
+  const [planChecks, setPlanChecks] = useState([])
 
   useEffect(() => {
     fetchDashboardData()
   }, [])
+
+  useEffect(() => {
+    if (!latestScreening?._id || !wellnessPlan.length) {
+      setPlanChecks([])
+      return
+    }
+    const key = `mann_mitra_wellness_${latestScreening._id}`
+    let saved = []
+    try {
+      const raw = localStorage.getItem(key)
+      saved = raw ? JSON.parse(raw) : []
+    } catch {
+      saved = []
+    }
+    const next = wellnessPlan.map((_, i) => Boolean(saved[i]))
+    setPlanChecks(next)
+  }, [latestScreening?._id, wellnessPlan])
+
+  const togglePlanStep = (index) => {
+    if (!latestScreening?._id || !wellnessPlan.length) return
+    setPlanChecks((prev) => {
+      const len = wellnessPlan.length
+      const base = wellnessPlan.map((_, i) => (i < prev.length ? prev[i] : false))
+      const next = base.map((v, i) => (i === index ? !v : v))
+      localStorage.setItem(`mann_mitra_wellness_${latestScreening._id}`, JSON.stringify(next))
+      return next
+    })
+  }
 
   const fetchDashboardData = async () => {
     setLoading(true)
@@ -30,7 +61,10 @@ const StudentDashboard = () => {
         setLatestAppointment(JSON.parse(savedAppointment))
       }
 
-      const appointmentsResponse = await callApi('/api/v1/appointments/me')
+      const [appointmentsResponse, screeningsResponse] = await Promise.all([
+        callApi('/api/v1/appointments/me'),
+        callApi('/api/v1/screenings/my-history?limit=1'),
+      ])
       if (appointmentsResponse.success) {
         const fetchedAppointments = appointmentsResponse.data || []
         setAppointments(fetchedAppointments)
@@ -62,16 +96,24 @@ const StudentDashboard = () => {
           }
         }
 
+        const latest = screeningsResponse?.success ? screeningsResponse.data?.screenings?.[0] : null
+        setLatestScreening(latest || null)
+        setWellnessPlan(await buildWellnessPlan(latest))
+
         setStats({
-          screeningsCompleted: 3,
+          screeningsCompleted: screeningsResponse?.success ? (screeningsResponse.data?.total || screeningsResponse.data?.count || 0) : 0,
           appointmentsScheduled: fetchedAppointments.length,
           forumPosts: 5,
           resourcesAccessed: 12
         })
       } else {
         const saved = localStorage.getItem('latestAppointment')
+        const latest = screeningsResponse?.success ? screeningsResponse.data?.screenings?.[0] : null
+        setLatestScreening(latest || null)
+        setWellnessPlan(await buildWellnessPlan(latest))
+
         setStats({
-          screeningsCompleted: 3,
+          screeningsCompleted: screeningsResponse?.success ? (screeningsResponse.data?.total || screeningsResponse.data?.count || 0) : 0,
           appointmentsScheduled: saved ? 1 : 0,
           forumPosts: 5,
           resourcesAccessed: 12
@@ -81,13 +123,57 @@ const StudentDashboard = () => {
       console.error('Error fetching dashboard data:', error)
       const saved = localStorage.getItem('latestAppointment')
       setStats({
-        screeningsCompleted: 3,
+        screeningsCompleted: 0,
         appointmentsScheduled: saved ? 1 : 0,
         forumPosts: 5,
         resourcesAccessed: 12
       })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const buildWellnessPlan = async (screening) => {
+    if (!screening) return []
+
+    const level = (screening.severity || '').toLowerCase()
+    const buddyUrl = import.meta.env.VITE_BUDDY_AGENT_URL || 'http://localhost:8000'
+
+    const basePlan = level.includes('severe')
+      ? [
+          'Book a counsellor session in the next 24 hours.',
+          'Tell one trusted person how you are feeling today.',
+          'Use grounding for 5 minutes: 5 things you see, 4 feel, 3 hear.',
+        ]
+      : level.includes('moderate')
+      ? [
+          'Schedule a counselling check-in this week.',
+          'Do 10 minutes of breathing + journaling daily.',
+          'Follow a fixed sleep and wake routine for 7 days.',
+        ]
+      : [
+          'Keep a simple daily mood log for one week.',
+          'Do one stress-relief activity each day (walk, music, stretching).',
+          'Review your progress and retake screening after 2 weeks.',
+        ]
+
+    try {
+      const query = `Give 3 short mental wellness action steps for ${screening.severity || 'mild'} depression screening score ${screening.score}.`
+      const encodedQuery = encodeURIComponent(query)
+      const response = await fetch(`${buddyUrl}/knowledge-base/search?query=${encodedQuery}&n_results=3`)
+      if (!response.ok) return basePlan
+
+      const data = await response.json()
+      const kbPlan = (data?.results || [])
+        .map(item => item?.text || '')
+        .filter(Boolean)
+        .map(text => text.split('\n')[0].trim())
+        .filter(Boolean)
+        .slice(0, 3)
+
+      return kbPlan.length ? kbPlan : basePlan
+    } catch (err) {
+      return basePlan
     }
   }
 
@@ -112,7 +198,8 @@ const StudentDashboard = () => {
     { title: 'Book Counselling', description: 'Schedule a professional session', link: '/booking', accent: 'bg-amber-500' },
     { title: 'Community Forum', description: 'Connect with peers', link: '/forum', accent: 'bg-sky-500' },
     { title: 'Access Resources', description: 'Browse articles & tools', link: '/resources', accent: 'bg-violet-500' },
-    { title: 'My Appointments', description: 'View & manage sessions', link: '/appointments', accent: 'bg-emerald-500' }
+    { title: 'My Appointments', description: 'View & manage sessions', link: '/appointments', accent: 'bg-emerald-500' },
+    { title: 'Screening history', description: 'Past PHQ-9 / GAD-7 results', link: '/screenings/history', accent: 'bg-violet-500' }
   ]
 
   return (
@@ -140,6 +227,74 @@ const StudentDashboard = () => {
             </div>
           ))}
         </div>
+
+        {/* Latest Screening + Plan */}
+        {latestScreening && (
+          <div className="mb-8">
+            <div className="bg-white rounded-2xl shadow-md overflow-hidden">
+              <div className="h-1.5 w-full bg-violet-500"></div>
+              <div className="p-6">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                  <h2 className="text-xl font-bold text-[#2A3F47]">Your Latest Screening Report</h2>
+                  <span className="px-3 py-1 rounded-full text-xs font-semibold bg-violet-50 text-violet-700">
+                    {latestScreening.tool} • Score {latestScreening.score} • {latestScreening.severity}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-500 mb-4">
+                  Completed on {new Date(latestScreening.createdAt).toLocaleString()}
+                </p>
+                <h3 className="font-semibold text-[#2A3F47] mb-2">Your plan — track progress</h3>
+                <p className="text-xs text-gray-500 mb-3">
+                  Check off steps as you go (saved on this device only).
+                </p>
+                <ul className="space-y-2 mb-4">
+                  {wellnessPlan.map((item, index) => (
+                    <li key={index} className="text-sm text-gray-700 flex items-start gap-3">
+                      <button
+                        type="button"
+                        onClick={() => togglePlanStep(index)}
+                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors ${
+                          planChecks[index]
+                            ? 'border-violet-600 bg-violet-600 text-white'
+                            : 'border-gray-300 bg-white hover:border-violet-400'
+                        }`}
+                        aria-pressed={planChecks[index]}
+                        aria-label={planChecks[index] ? 'Mark step incomplete' : 'Mark step complete'}
+                      >
+                        {planChecks[index] ? (
+                          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : null}
+                      </button>
+                      <span className={planChecks[index] ? 'line-through text-gray-400' : ''}>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex flex-wrap gap-3">
+                  <Link
+                    to="/screenings/history"
+                    className="px-4 py-2 border border-violet-200 text-violet-800 text-sm font-medium rounded-xl hover:bg-violet-50 transition-colors"
+                  >
+                    Full history
+                  </Link>
+                  <Link
+                    to="/booking"
+                    className="px-4 py-2 bg-teal-800 text-white text-sm font-medium rounded-xl hover:bg-teal-900 transition-colors"
+                  >
+                    Book Counsellor
+                  </Link>
+                  <Link
+                    to="/resources"
+                    className="px-4 py-2 border border-gray-200 text-gray-700 text-sm font-medium rounded-xl hover:bg-gray-50 transition-colors"
+                  >
+                    Open Resources
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Latest Appointment */}
         {latestAppointment && (

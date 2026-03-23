@@ -107,13 +107,13 @@ const CrisisModal = ({ isOpen, onClose, crisisType, onContactCounselor }) => {
                 className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all duration-200 hover:shadow-md group ${
                   isImmediate
                     ? 'border-red-200 hover:border-red-400 hover:bg-red-50'
-                    : 'border-purple-200 hover:border-purple-400 hover:bg-purple-50'
+                    : 'border-teal-200 hover:border-teal-400 hover:bg-teal-50'
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
                   isImmediate
                     ? 'bg-red-100 text-red-600 group-hover:bg-red-200'
-                    : 'bg-purple-100 text-purple-600 group-hover:bg-purple-200'
+                    : 'bg-teal-100 text-teal-700 group-hover:bg-teal-200'
                 }`}>
                   {isContactingCounselor ? (
                     <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -138,9 +138,9 @@ const CrisisModal = ({ isOpen, onClose, crisisType, onContactCounselor }) => {
               {/* Browse Resources */}
               <button
                 onClick={() => { onClose(); navigate('/resources') }}
-                className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-blue-200 hover:border-blue-400 hover:bg-blue-50 transition-all duration-200 hover:shadow-md group"
+                className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-teal-200 hover:border-teal-400 hover:bg-teal-50 transition-all duration-200 hover:shadow-md group"
               >
-                <div className="w-12 h-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0 group-hover:bg-blue-200">
+                <div className="w-12 h-12 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center flex-shrink-0 group-hover:bg-teal-200">
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                       d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />

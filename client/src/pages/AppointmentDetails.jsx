@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useApi } from '../hooks/useApi'
 
@@ -26,7 +26,6 @@ const AppointmentDetails = () => {
       const response = await callApi(`/api/v1/appointments/${id}`, 'GET')
       
       if (response.success) {
-        // The useApi hook wraps the server response in a 'data' field
         const serverResponse = response.data || response
         setAppointment(serverResponse.appointment || serverResponse)
       } else {
@@ -42,45 +41,30 @@ const AppointmentDetails = () => {
 
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
-      case 'confirmed':
-        return 'bg-green-100 text-green-800'
-      case 'pending':
-      case 'requested':
-        return 'bg-yellow-100 text-yellow-800'
-      case 'completed':
-        return 'bg-blue-100 text-blue-800'
-      case 'cancelled':
-        return 'bg-red-100 text-red-800'
-      default:
-        return 'bg-gray-100 text-gray-800'
+      case 'confirmed': return 'bg-emerald-50 text-emerald-700'
+      case 'pending': case 'requested': return 'bg-amber-50 text-amber-700'
+      case 'completed': return 'bg-sky-50 text-sky-700'
+      case 'cancelled': return 'bg-rose-50 text-rose-700'
+      default: return 'bg-gray-100 text-gray-700'
     }
   }
 
-  const getModeIcon = (mode) => {
-    switch (mode?.toLowerCase()) {
-      case 'video':
-        return '📹'
-      case 'chat':
-      case 'tele':
-        return '💬'
-      case 'in-person':
-        return '🏢'
-      default:
-        return '📱'
+  const getStatusDot = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'confirmed': return 'bg-emerald-500'
+      case 'pending': case 'requested': return 'bg-amber-500'
+      case 'completed': return 'bg-sky-500'
+      case 'cancelled': return 'bg-rose-500'
+      default: return 'bg-gray-400'
     }
   }
 
   const getModeLabel = (mode) => {
     switch (mode?.toLowerCase()) {
-      case 'video':
-        return 'Video Call'
-      case 'chat':
-      case 'tele':
-        return 'Online Chat'
-      case 'in-person':
-        return 'In-Person Meeting'
-      default:
-        return 'Online Session'
+      case 'video': return 'Video Call'
+      case 'chat': case 'tele': return 'Online Chat'
+      case 'in-person': return 'In-Person Meeting'
+      default: return 'Online Session'
     }
   }
 
@@ -104,10 +88,8 @@ const AppointmentDetails = () => {
   }
 
   const joinSession = () => {
-    if (appointment.mode === 'video') {
-      alert('Video call feature will be integrated with video conferencing service')
-    } else if (appointment.mode === 'chat' || appointment.mode === 'tele') {
-      window.location.href = '/chat'
+    if (appointment.mode === 'video' || appointment.mode === 'chat' || appointment.mode === 'tele') {
+      navigate(`/chat-platform?appointment=${appointment._id}&user=${appointment.counsellorId?._id || appointment.counsellorId}`)
     } else {
       alert('Please visit the counseling center at the scheduled time')
     }
@@ -115,10 +97,10 @@ const AppointmentDetails = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F9F7F4' }}>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading appointment details...</p>
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-teal-800 mx-auto mb-4"></div>
+          <p className="text-gray-500">Loading appointment details...</p>
         </div>
       </div>
     )
@@ -126,18 +108,32 @@ const AppointmentDetails = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-red-600 text-2xl">❌</span>
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F9F7F4' }}>
+        <div className="bg-white rounded-2xl shadow-md overflow-hidden max-w-md w-full mx-4 text-center">
+          <div className="h-1.5 w-full bg-rose-500"></div>
+          <div className="p-8">
+            <div className="w-14 h-14 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-7 h-7 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-semibold text-[#2A3F47] mb-2">{error}</h2>
+            <p className="text-gray-500 mb-6">Please try again or contact support if the problem persists.</p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={fetchAppointment}
+                className="px-4 py-2 bg-teal-800 text-white rounded-xl font-medium hover:bg-teal-900 transition-colors"
+              >
+                Try Again
+              </button>
+              <button
+                onClick={() => navigate('/appointments')}
+                className="px-4 py-2 border border-gray-200 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+              >
+                Back to Appointments
+              </button>
+            </div>
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">{error}</h2>
-          <button
-            onClick={() => navigate('/appointments')}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-          >
-            Back to Appointments
-          </button>
         </div>
       </div>
     )
@@ -148,111 +144,143 @@ const AppointmentDetails = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#F9F7F4' }}>
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-6">
           <button
             onClick={() => navigate('/appointments')}
-            className="flex items-center text-indigo-600 hover:text-indigo-700 mb-4"
+            className="flex items-center text-teal-800 hover:text-teal-900 transition-colors mb-4"
           >
             <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
             Back to Appointments
           </button>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+          <h1 className="text-4xl font-bold text-teal-800">
             Appointment Details
           </h1>
+          <p className="text-gray-500 text-lg mt-2">View your session information and manage your appointment</p>
         </div>
 
-        {/* Appointment Card */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-          {/* Header */}
-          <div className="p-6 border-b border-gray-200">
+        {/* Main Appointment Card */}
+        <div className="bg-white rounded-2xl shadow-md overflow-hidden">
+          {/* Accent stripe */}
+          <div className={`h-1.5 w-full ${getStatusDot(appointment.status)}`}></div>
+
+          {/* Counsellor Header */}
+          <div className="p-6 border-b border-gray-100">
             <div className="flex items-start justify-between">
               <div className="flex items-center space-x-4">
-                <div className="w-16 h-16 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xl font-semibold">
-                  {appointment.counsellor?.name?.charAt(0) || 'C'}
+                <div className="w-14 h-14 bg-[#F9E6D0] rounded-full flex items-center justify-center">
+                  <span className="text-lg font-bold text-teal-800">
+                    {appointment.counsellor?.name?.charAt(0) || appointment.counsellorId?.name?.charAt(0) || 'C'}
+                  </span>
                 </div>
                 <div>
-                  <h2 className="text-2xl font-semibold text-gray-900">
-                    {appointment.counsellor?.name || 'Counsellor'}
+                  <h2 className="text-xl font-semibold text-[#2A3F47]">
+                    {appointment.counsellor?.name || appointment.counsellorId?.name || 'Counsellor'}
                   </h2>
-                  <p className="text-gray-600">
-                    {appointment.counsellor?.specialization || 'Mental Health Professional'}
+                  <p className="text-gray-500 text-sm">
+                    {appointment.counsellor?.specialization || appointment.counsellorId?.specialization || 'Mental Health Professional'}
                   </p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Experience: {appointment.counsellor?.experience || 'N/A'}
-                  </p>
+                  {(appointment.counsellor?.experience || appointment.counsellorId?.experience) && (
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {appointment.counsellor?.experience || appointment.counsellorId?.experience} years experience
+                    </p>
+                  )}
                 </div>
               </div>
-              
-              <div className="flex flex-col items-end space-y-2">
-                <span className={`px-4 py-2 rounded-full text-sm font-medium ${getStatusColor(appointment.status)}`}>
-                  {appointment.status || 'Pending'}
-                </span>
-                <span className="text-sm text-gray-500">
-                  {getModeIcon(appointment.mode)} {getModeLabel(appointment.mode)}
-                </span>
-              </div>
+
+              <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${getStatusColor(appointment.status)}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${getStatusDot(appointment.status)}`}></span>
+                {appointment.status || 'Pending'}
+              </span>
             </div>
           </div>
 
-          {/* Details */}
+          {/* Details Grid */}
           <div className="p-6">
             <div className="grid md:grid-cols-2 gap-6 mb-6">
-              {/* Date & Time */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                  <span className="mr-2">📅</span>
+              {/* Date & Time Section */}
+              <div>
+                <h3 className="text-sm font-semibold tracking-widest text-teal-700 uppercase mb-3 flex items-center">
+                  <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
                   Date & Time
                 </h3>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="space-y-2">
-                    <div>
-                      <p className="text-sm text-gray-500">Date</p>
-                      <p className="font-medium text-gray-900">{formatDate(appointment.slotStart)}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Time</p>
-                      <p className="font-medium text-gray-900">
-                        {formatTime(appointment.slotStart)} - {formatTime(appointment.slotEnd)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Duration</p>
-                      <p className="font-medium text-gray-900">{appointment.duration || '60'} minutes</p>
-                    </div>
+                <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                  <div>
+                    <p className="text-xs text-gray-400 mb-0.5">Date</p>
+                    <p className="font-medium text-[#2A3F47]">{formatDate(appointment.slotStart)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 mb-0.5">Time</p>
+                    <p className="font-medium text-[#2A3F47]">
+                      {formatTime(appointment.slotStart)} – {formatTime(appointment.slotEnd)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 mb-0.5">Duration</p>
+                    <p className="font-medium text-[#2A3F47]">{appointment.duration || '60'} minutes</p>
                   </div>
                 </div>
               </div>
 
-              {/* Session Info */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                  <span className="mr-2">ℹ️</span>
+              {/* Session Info Section */}
+              <div>
+                <h3 className="text-sm font-semibold tracking-widest text-teal-700 uppercase mb-3 flex items-center">
+                  <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
                   Session Information
                 </h3>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="space-y-2">
-                    <div>
-                      <p className="text-sm text-gray-500">Session Type</p>
-                      <p className="font-medium text-gray-900">{getModeLabel(appointment.mode)}</p>
+                <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                  <div>
+                    <p className="text-xs text-gray-400 mb-0.5">Session Type</p>
+                    <div className="flex items-center">
+                      <svg className="w-4 h-4 mr-2 text-teal-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        {appointment.mode === 'video' ? (
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        ) : (appointment.mode === 'chat' || appointment.mode === 'tele') ? (
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        ) : (
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        )}
+                      </svg>
+                      <p className="font-medium text-[#2A3F47]">{getModeLabel(appointment.mode)}</p>
                     </div>
-                    {appointment.urgency && (
-                      <div>
-                        <p className="text-sm text-gray-500">Urgency</p>
-                        <p className="font-medium text-gray-900 capitalize">{appointment.urgency}</p>
-                      </div>
-                    )}
-                    {appointment.location && appointment.mode === 'in-person' && (
-                      <div>
-                        <p className="text-sm text-gray-500">Location</p>
-                        <p className="font-medium text-gray-900">📍 {appointment.location}</p>
-                      </div>
-                    )}
                   </div>
+                  {appointment.urgency && (
+                    <div>
+                      <p className="text-xs text-gray-400 mb-0.5">Priority</p>
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                        appointment.urgency === 'high' ? 'bg-rose-50 text-rose-700' :
+                        appointment.urgency === 'medium' ? 'bg-amber-50 text-amber-700' :
+                        'bg-emerald-50 text-emerald-700'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${
+                          appointment.urgency === 'high' ? 'bg-rose-500' :
+                          appointment.urgency === 'medium' ? 'bg-amber-500' :
+                          'bg-emerald-500'
+                        }`}></span>
+                        {appointment.urgency} priority
+                      </span>
+                    </div>
+                  )}
+                  {appointment.location && appointment.mode === 'in-person' && (
+                    <div>
+                      <p className="text-xs text-gray-400 mb-0.5">Location</p>
+                      <div className="flex items-center">
+                        <svg className="w-4 h-4 mr-2 text-teal-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <p className="font-medium text-[#2A3F47]">{appointment.location}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -260,51 +288,58 @@ const AppointmentDetails = () => {
             {/* Reason */}
             {appointment.reason && (
               <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
-                  <span className="mr-2">💭</span>
+                <h3 className="text-sm font-semibold tracking-widest text-teal-700 uppercase mb-3 flex items-center">
+                  <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
                   Reason for Consultation
                 </h3>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-gray-700">{appointment.reason}</p>
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-gray-600 text-sm leading-relaxed">{appointment.reason}</p>
                 </div>
               </div>
             )}
 
-            {/* Private Notes (if available and decrypted) */}
+            {/* Private Notes */}
             {appointment.privateNotes && (
               <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
-                  <span className="mr-2">🔒</span>
+                <h3 className="text-sm font-semibold tracking-widest text-teal-700 uppercase mb-3 flex items-center">
+                  <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
                   Private Notes
                 </h3>
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <p className="text-sm text-yellow-800 mb-2">
-                    <strong>Note:</strong> These notes are encrypted and only visible to you and your counsellor.
+                <div className="rounded-xl p-4 border border-gray-200" style={{ backgroundColor: '#F9E6D0' }}>
+                  <p className="text-xs text-gray-500 mb-2 font-medium">
+                    These notes are encrypted and only visible to you and your counsellor.
                   </p>
-                  <p className="text-gray-700">{appointment.privateNotes}</p>
+                  <p className="text-[#2A3F47] text-sm leading-relaxed">{appointment.privateNotes}</p>
                 </div>
               </div>
             )}
 
             {/* Action Buttons */}
-            <div className="flex flex-wrap gap-3 pt-6 border-t border-gray-200">
+            <div className="flex flex-wrap gap-3 pt-6 border-t border-gray-100">
               {(appointment.status === 'confirmed' || appointment.status === 'pending') && (
                 <button
                   onClick={joinSession}
-                  className={`px-6 py-3 rounded-lg font-medium transition-colors flex items-center ${
-                    appointment.mode === 'video'
-                      ? 'bg-green-600 text-white hover:bg-green-700'
-                      : appointment.mode === 'chat' || appointment.mode === 'tele'
-                      ? 'bg-blue-600 text-white hover:bg-blue-700'
-                      : 'bg-purple-600 text-white hover:bg-purple-700'
-                  }`}
+                  className="flex-1 sm:flex-none px-6 py-3 bg-teal-800 text-white rounded-xl font-medium text-sm hover:bg-teal-900 transition-colors flex items-center justify-center"
                 >
-                  {appointment.mode === 'video' && '📹 Join Video Call'}
-                  {(appointment.mode === 'chat' || appointment.mode === 'tele') && '💬 Start Chat Session'}
-                  {appointment.mode === 'in-person' && '🏢 View Meeting Details'}
+                  <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    {appointment.mode === 'video' ? (
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    ) : (appointment.mode === 'chat' || appointment.mode === 'tele') ? (
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    ) : (
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    )}
+                  </svg>
+                  {appointment.mode === 'video' && 'Start Video Call'}
+                  {(appointment.mode === 'chat' || appointment.mode === 'tele') && 'Start Chat Session'}
+                  {appointment.mode === 'in-person' && 'View Meeting Details'}
                 </button>
               )}
-              
+
               {appointment.status === 'pending' && (
                 <button
                   onClick={() => {
@@ -312,31 +347,46 @@ const AppointmentDetails = () => {
                       alert('Cancellation feature will be implemented')
                     }
                   }}
-                  className="px-6 py-3 text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors"
+                  className="px-6 py-3 text-rose-600 border border-rose-200 rounded-xl text-sm font-medium hover:bg-rose-50 transition-colors"
                 >
                   Cancel Appointment
                 </button>
               )}
-              
-              <button
-                onClick={() => navigate('/booking')}
-                className="px-6 py-3 text-indigo-600 border border-indigo-300 rounded-lg hover:bg-indigo-50 transition-colors"
+
+              <Link
+                to="/booking"
+                className="px-6 py-3 border-2 border-teal-800 text-teal-800 rounded-xl text-sm font-medium hover:bg-teal-800 hover:text-white transition-all"
               >
                 Book Another Session
-              </button>
+              </Link>
             </div>
           </div>
         </div>
 
-        {/* Additional Information */}
-        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h4 className="font-medium text-blue-900 mb-2">Important Information</h4>
-          <ul className="text-sm text-blue-800 space-y-1">
-            <li>• Please join your session on time to make the most of your appointment</li>
-            <li>• If you need to reschedule, please do so at least 24 hours in advance</li>
-            <li>• All conversations are confidential and secure</li>
-            <li>• If you're in crisis, please contact emergency services immediately</li>
-          </ul>
+        {/* Important Information Card */}
+        <div className="mt-6 bg-white rounded-2xl shadow-md overflow-hidden">
+          <div className="h-1.5 w-full bg-teal-500"></div>
+          <div className="p-6">
+            <h4 className="font-semibold text-[#2A3F47] mb-4 flex items-center">
+              <svg className="w-5 h-5 mr-2 text-teal-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Important Information
+            </h4>
+            <div className="space-y-2">
+              {[
+                'Please join your session on time to make the most of your appointment',
+                'If you need to reschedule, please do so at least 24 hours in advance',
+                'All conversations are confidential and secure',
+                'If you\'re in crisis, please contact emergency services immediately'
+              ].map((item, i) => (
+                <div key={i} className="flex items-start">
+                  <div className="w-1.5 h-1.5 bg-teal-600 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                  <span className="text-gray-500 text-sm">{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>

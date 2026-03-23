@@ -17,6 +17,7 @@ const screeningValidation = [
   body('responses')
     .isArray({ min: 7, max: 9 })
     .withMessage('Responses must be an array with 7-9 elements')
+    .bail()
     .custom((value, { req }) => {
       const expectedLength = req.body.tool === 'PHQ-9' ? 9 : 7;
       if (value.length !== expectedLength) {

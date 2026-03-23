@@ -275,14 +275,20 @@ class DecisionEngine:
 
     @staticmethod
     def _detect_topic_hint(message: str) -> Optional[str]:
+        """Topic hints aligned with vector store metadata for better retrieval."""
         lower = message.lower()
         topics = {
-            "anxiety": ["anxious", "anxiety", "worried", "nervous", "panic"],
-            "depression": ["depressed", "depression", "sad", "hopeless", "empty"],
-            "stress": ["stress", "overwhelmed", "pressure", "burnout"],
-            "crisis": ["suicide", "self-harm", "kill", "die", "end my life"],
-            "mindfulness": ["meditation", "calm", "breathing", "relax"],
-            "relationships": ["lonely", "alone", "isolated", "relationship"],
+            "crisis": ["suicide", "self-harm", "kill", "die", "end my life", "suicidal", "988", "crisis"],
+            "anxiety": ["anxious", "anxiety", "worried", "nervous", "panic", "panic attack", "worried"],
+            "depression": ["depressed", "depression", "sad", "hopeless", "empty", "low mood"],
+            "stress": ["stress", "overwhelmed", "pressure", "burnout", "stressed"],
+            "cbt": ["cbt", "cognitive", "thoughts", "behavior", "negative thinking"],
+            "substance_use": ["drug", "alcohol", "substance", "addiction", "using"],
+            "personality_disorders": ["personality", "borderline", "bpd", "disorder"],
+            "mindfulness": ["meditation", "calm", "breathing", "relax", "grounding", "mindful"],
+            "self_care": ["sleep", "exercise", "nutrition", "self-care", "routine", "wellness"],
+            "relationships": ["lonely", "alone", "isolated", "relationship", "friends", "social"],
+            "mental_health_general": ["mental health", "therapy", "counseling", "wellbeing"],
         }
         for topic, keywords in topics.items():
             if any(k in lower for k in keywords):

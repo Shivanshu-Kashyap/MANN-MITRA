@@ -5,46 +5,55 @@ export const phq9Questions = [
   {
     id: 'phq9_1',
     key: 'q1',
+    text: 'Little interest or pleasure in doing things',
     audioId: 'phq9_1_audio'
   },
   {
     id: 'phq9_2', 
     key: 'q2',
+    text: 'Feeling down, depressed, or hopeless',
     audioId: 'phq9_2_audio'
   },
   {
     id: 'phq9_3',
     key: 'q3',
+    text: 'Trouble falling or staying asleep, or sleeping too much',
     audioId: 'phq9_3_audio'
   },
   {
     id: 'phq9_4',
     key: 'q4',
+    text: 'Feeling tired or having little energy',
     audioId: 'phq9_4_audio'
   },
   {
     id: 'phq9_5',
     key: 'q5',
+    text: 'Poor appetite or overeating',
     audioId: 'phq9_5_audio'
   },
   {
     id: 'phq9_6',
     key: 'q6',
+    text: 'Feeling bad about yourself — or that you are a failure or have let yourself or your family down',
     audioId: 'phq9_6_audio'
   },
   {
     id: 'phq9_7',
     key: 'q7',
+    text: 'Trouble concentrating on things, such as reading the newspaper or watching television',
     audioId: 'phq9_7_audio'
   },
   {
     id: 'phq9_8',
     key: 'q8',
+    text: 'Moving or speaking so slowly that other people could have noticed? Or the opposite — being so fidgety or restless that you have been moving around a lot more than usual',
     audioId: 'phq9_8_audio'
   },
   {
     id: 'phq9_9',
     key: 'q9',
+    text: 'Thoughts that you would be better off dead or of hurting yourself in some way',
     audioId: 'phq9_9_audio'
   }
 ]
@@ -54,21 +63,25 @@ export const PHQ9_ANSWERS = [
   {
     value: 0,
     key: 'notAtAll',
+    label: 'Not at all',
     score: 0
   },
   {
     value: 1,
     key: 'severalDays',
+    label: 'Several days',
     score: 1
   },
   {
     value: 2,
     key: 'moreThanHalf',
+    label: 'More than half the days',
     score: 2
   },
   {
     value: 3,
     key: 'nearlyEveryDay',
+    label: 'Nearly every day',
     score: 3
   }
 ]

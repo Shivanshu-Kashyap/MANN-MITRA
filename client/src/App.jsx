@@ -10,6 +10,7 @@ import AdminLogin from './pages/AdminLogin'
 import AdminSignup from './pages/AdminSignup'
 import CounsellorLogin from './pages/CounsellorLogin'
 import Screening from './pages/Screening'
+import ScreeningHistory from './pages/ScreeningHistory'
 import Chat from './pages/Chat'
 import ChatPlatform from './pages/ChatPlatform'
 import Booking from './pages/Booking'
@@ -56,6 +57,7 @@ function App() {
                 <Route path="/counsellor/login" element={<CounsellorLogin />} />
                 <Route path="/" element={<Home />} />
                 <Route path="/screening" element={<Screening />} />
+                <Route path="/screenings/history" element={<RoleProtectedRoute requiredRole="student"><ScreeningHistory /></RoleProtectedRoute>} />
                 <Route path="/dashboard" element={<RoleProtectedRoute requiredRole="student"><StudentDashboard /></RoleProtectedRoute>} />
                 <Route path="/chat" element={<Chat />} />
                 <Route path="/booking" element={<Booking />} />
