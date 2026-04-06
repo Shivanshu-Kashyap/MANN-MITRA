@@ -140,32 +140,30 @@ class VectorStore:
             )
         return len(ids)
 
-    def query(
-        self,
-        query_text: str,
-        n_results: int = None,
-        severity_filter: Optional[str] = None,
-        topic_filter: Optional[str] = None,
-    ) -> list[dict]:
-        """
-        Semantic search against the knowledge base.
-        Returns list of {text, metadata, distance}.
-        """
-        n = n_results or settings.RAG_TOP_K
-        where_filter = None
-
+    @staticmethod
+    def _build_where(
+        severity_filter: Optional[str],
+        topic_filter: Optional[str],
+    ) -> Optional[dict]:
         if severity_filter and topic_filter:
-            where_filter = {
+            return {
                 "$and": [
                     {"severity_category": severity_filter},
                     {"topic": topic_filter},
                 ]
             }
-        elif severity_filter:
-            where_filter = {"severity_category": severity_filter}
-        elif topic_filter:
-            where_filter = {"topic": topic_filter}
+        if severity_filter:
+            return {"severity_category": severity_filter}
+        if topic_filter:
+            return {"topic": topic_filter}
+        return None
 
+    def _query_raw(
+        self,
+        query_text: str,
+        n: int,
+        where_filter: Optional[dict],
+    ) -> list[dict]:
         try:
             results = self.collection.query(
                 query_texts=[query_text],
@@ -179,7 +177,6 @@ class VectorStore:
                 n_results=n,
                 include=["documents", "metadatas", "distances"],
             )
-
         items = []
         if results and results["documents"] and results["documents"][0]:
             for text, meta, dist in zip(
@@ -188,6 +185,35 @@ class VectorStore:
                 results["distances"][0],
             ):
                 items.append({"text": text, "metadata": meta, "distance": dist})
+        return items
+
+    def query(
+        self,
+        query_text: str,
+        n_results: int = None,
+        severity_filter: Optional[str] = None,
+        topic_filter: Optional[str] = None,
+        allow_topic_fallback: bool = False,
+    ) -> list[dict]:
+        """
+        Semantic search against the knowledge base.
+        Returns list of {text, metadata, distance}.
+
+        KB chunks are tagged by *content* severity/topic, not the user's live risk level.
+        When allow_topic_fallback is True (chat RAG), if a topic filter returns too few
+        hits—e.g. user message maps to "anxiety" but chunks are tagged "general"—we retry
+        without the topic filter, matching plain RetrievalQA-style semantic search.
+        """
+        n = n_results or settings.RAG_TOP_K
+        where_filter = self._build_where(severity_filter, topic_filter)
+        items = self._query_raw(query_text, n, where_filter)
+
+        if allow_topic_fallback and topic_filter and len(items) < 2:
+            relaxed = self._build_where(severity_filter, None)
+            items = self._query_raw(query_text, n, relaxed)
+        if allow_topic_fallback and len(items) < 2:
+            items = self._query_raw(query_text, n, None)
+
         return items
 
     def get_stats(self) -> dict:

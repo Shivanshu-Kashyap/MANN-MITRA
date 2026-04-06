@@ -8,7 +8,8 @@ const {
   updateProfile,
   adminLogin,
   counsellorLogin,
-  adminSignup
+  adminSignup,
+  listOrganizations
 } = require('../controllers/auth.controller');
 const { protect } = require('../middlewares/auth.middleware');
 
@@ -31,12 +32,17 @@ const registerValidation = [
     .withMessage('Name must be between 2 and 50 characters')
     .matches(/^[a-zA-Z\s]+$/)
     .withMessage('Name can only contain letters and spaces'),
-  body('collegeId')
+  body('organizationKey')
     .trim()
-    .isLength({ min: 3, max: 20 })
-    .withMessage('College ID must be between 3 and 20 characters')
-    .matches(/^[a-zA-Z0-9]+$/)
-    .withMessage('College ID can only contain letters and numbers'),
+    .matches(/^ADMIN[0-9]+$/)
+    .withMessage('Please select your organization'),
+  body().custom((_, { req }) => {
+    const id = (req.body.memberId || req.body.collegeId || '').trim();
+    if (!id || id.length < 3 || id.length > 20 || !/^[a-zA-Z0-9]+$/.test(id)) {
+      throw new Error('Roll number, employee ID, or member ID must be 3–20 letters or numbers');
+    }
+    return true;
+  }),
   body('role')
     .optional()
     .isIn(['student', 'counsellor', 'admin', 'moderator'])
@@ -74,15 +80,19 @@ const updateProfileValidation = [
 ];
 
 // Public routes
+router.get('/organizations', listOrganizations);
 router.post('/register', registerValidation, register); // Students only
 router.post('/login', loginValidation, login); // Students only
 
 // Admin specific routes
 router.post('/admin/signup', [
-  body('collegeName')
-    .trim()
-    .isLength({ min: 2, max: 100 })
-    .withMessage('College name must be between 2 and 100 characters'),
+  body().custom((_, { req }) => {
+    const n = (req.body.organizationName ?? req.body.collegeName ?? '').trim();
+    if (!n || n.length < 2 || n.length > 100) {
+      throw new Error('Organization name must be between 2 and 100 characters');
+    }
+    return true;
+  }),
   body('email')
     .isEmail()
     .normalizeEmail()

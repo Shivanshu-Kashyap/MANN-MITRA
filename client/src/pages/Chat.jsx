@@ -770,50 +770,54 @@ const Chat = () => {
     return (
       <div
         key={message.id}
-        className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}
+        className={`flex w-full mb-8 ${isUser ? 'justify-end' : 'justify-start'}`}
       >
-        <div className={`max-w-[70%] ${isUser ? 'order-2' : 'order-1'}`}>
-          {/* Avatar for non-user messages */}
-          {!isUser && (
-            <div className="flex items-center mb-2">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-2 ${
-                isSystem ? 'bg-yellow-100' : 'bg-blue-100'
-              }`}>
-                {isSystem ? (
-                  <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                ) : (
-                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                )}
-              </div>
-              <span className="text-xs text-gray-500">
-                {isSystem ? t('chat.system') : t('chat.aiAssistant')}
-              </span>
+        {/* Avatar for non-user messages */}
+        {!isUser && (
+          <div className="flex-shrink-0 mr-4 mt-1">
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+              isSystem ? 'bg-yellow-100 text-yellow-600' : 'bg-[#466a65]/10 text-[#466a65]'
+            }`}>
+              {isSystem ? (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+              )}
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Message Bubble */}
-          <div
-            className={`relative px-4 py-3 rounded-2xl ${
-              isUser
-                ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white'
-                : isSystem
-                ? 'bg-yellow-50 border border-yellow-200 text-yellow-800'
-                : message.isError
-                ? 'bg-red-50 border border-red-200 text-red-800'
-                : 'bg-white border border-gray-200 text-gray-900'
-            } shadow-sm`}
-          >
+        {/* Message Bubble */}
+        <div
+          className={`relative text-sm leading-relaxed ${
+            isUser
+              ? 'bg-[#f4f4f4] text-gray-800 rounded-[24px] px-5 py-3 max-w-[75%]'
+              : isSystem
+              ? 'bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-2xl px-5 py-3 max-w-[85%]'
+              : message.isError
+              ? 'bg-red-50 border border-red-200 text-red-800 rounded-2xl px-5 py-3 max-w-[85%]'
+              : 'bg-transparent text-gray-800 py-1.5 max-w-[85%]'
+          }`}
+        >
             {/* Message Content */}
-            <div className="text-sm leading-relaxed whitespace-pre-wrap">
+            <div className="whitespace-pre-wrap">
               {message.text}
               {/* Voice indicator */}
               {message.isVoice && (
-                <span className="inline-flex items-center ml-2 text-xs">
-                  {message.sender === 'user' ? '🎤' : '🔊'}
+                <span className={`inline-flex items-center ml-2 text-xs ${isUser ? 'text-gray-400' : 'text-[#466a65]'}`}>
+                  {message.sender === 'user' ? (
+                    <svg className="w-3 h-3 ml-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                    </svg>
+                  ) : (
+                    <svg className="w-3 h-3 ml-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M11 5L6 9H2v6h4l5 4V5z" />
+                    </svg>
+                  )}
                 </span>
               )}
             </div>
@@ -855,12 +859,16 @@ const Chat = () => {
 
             {/* Coping Exercise Card */}
             {message.copingExercise && (
-              <div className="mt-3 p-3 bg-teal-50 border border-teal-200 rounded-xl">
+              <div className="mt-3 p-4 bg-[#f9ebe4] border border-[#f0dacd] rounded-xl">
                 <div className="flex items-center mb-2">
-                  <span className="text-teal-600 mr-2">🧘</span>
-                  <span className="font-semibold text-teal-800 text-sm">{message.copingExercise.title}</span>
+                  <div className="w-6 h-6 rounded-full bg-[#eca884] flex items-center justify-center mr-2 text-white">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <span className="font-semibold text-orange-900 text-sm">{message.copingExercise.title}</span>
                   {message.copingExercise.duration && (
-                    <span className="ml-auto text-xs text-teal-600 bg-teal-100 px-2 py-0.5 rounded">{message.copingExercise.duration}</span>
+                    <span className="ml-auto text-xs font-medium text-orange-800 bg-orange-100/50 px-2 py-0.5 rounded-full">{message.copingExercise.duration}</span>
                   )}
                 </div>
                 {message.copingExercise.instructions && (
@@ -875,16 +883,22 @@ const Chat = () => {
 
             {/* Inline Counsellor Recommendation */}
             {message.counsellorRec?.recommended && (
-              <div className={`mt-3 p-3 rounded-xl border ${
+              <div className={`mt-3 p-4 rounded-xl border ${
                 message.counsellorRec.urgency === 'immediate' ? 'bg-red-50 border-red-200' :
                 message.counsellorRec.urgency === 'high' ? 'bg-orange-50 border-orange-200' :
-                'bg-blue-50 border-blue-200'
+                'bg-[#f9ebe4] border-[#f0dacd]'
               }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
-                    <span className="mr-2">{message.counsellorRec.urgency === 'immediate' ? '🚨' : '💬'}</span>
-                    <span className={`text-xs font-medium ${
-                      message.counsellorRec.urgency === 'immediate' ? 'text-red-700' : 'text-blue-700'
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${
+                      message.counsellorRec.urgency === 'immediate' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'
+                    }`}>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                    </div>
+                    <span className={`text-sm font-medium ${
+                      message.counsellorRec.urgency === 'immediate' ? 'text-red-700' : 'text-orange-900'
                     }`}>
                       {message.counsellorRec.message}
                     </span>
@@ -950,8 +964,8 @@ const Chat = () => {
             )}
 
             {/* Timestamp */}
-            <div className={`mt-2 text-xs ${
-              isUser ? 'text-blue-100' : 'text-gray-500'
+            <div className={`mt-2 text-[11px] ${
+              isUser ? 'text-gray-400' : 'text-gray-400'
             }`}>
               {message.timestamp.toLocaleTimeString([], { 
                 hour: '2-digit', 
@@ -959,13 +973,12 @@ const Chat = () => {
               })}
             </div>
           </div>
-        </div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-orange-50 to-yellow-50" style={{ backgroundColor: '#F9F7F4' }}>
+    <div className="flex flex-col h-full w-full bg-white relative overflow-hidden">
       {/* Custom CSS Styles */}
       <style jsx>{`
         /* Voice-only UI Animations */
@@ -1062,15 +1075,17 @@ const Chat = () => {
       `}</style>
 
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
-        <div className="flex items-center justify-between">
+      <div className="bg-white border-b border-gray-100 w-full">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex items-center justify-between">
           <div className="flex items-center">
-            <div className="w-12 h-12 bg-teal-800 rounded-full flex items-center justify-center mr-3">
-              <span className="text-white font-bold text-lg">🤖</span>
+            <div className="w-12 h-12 bg-[#466a65]/10 text-[#466a65] rounded-xl flex items-center justify-center mr-4">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+              </svg>
             </div>
             <div>
               <h1 className="text-xl font-semibold text-gray-900">
-                Buddy - Your Mental Health Companion
+                Buddy - Mental Health Support
               </h1>
               <div className="flex items-center text-sm text-gray-500">
                 <div className={`w-2 h-2 rounded-full mx-2 ${
@@ -1094,13 +1109,13 @@ const Chat = () => {
           <div className="flex items-center space-x-3">
             <button
               onClick={() => setIsVoiceMode(!isVoiceMode)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 transform hover:scale-105 ${
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
                 isVoiceMode
-                  ? 'bg-teal-800 text-white shadow-lg hover:bg-teal-900'
-                  : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'
+                  ? 'bg-[#466a65] text-white shadow-sm hover:bg-[#385551]'
+                  : 'bg-gray-50 text-gray-700 border border-gray-200 hover:bg-gray-100'
               }`}
             >
-              {isVoiceMode ? '🎤 Voice Mode' : '💬 Text Mode'}
+              {isVoiceMode ? 'Voice Mode Active' : 'Switch to Voice'}
             </button>
             <div className="text-sm text-gray-500">
               RAG-Powered Support
@@ -1117,9 +1132,13 @@ const Chat = () => {
           }`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center flex-1">
-                <span className={`mr-2 text-lg ${riskLevel === 'critical' ? '' : ''}`}>
-                  {riskLevel === 'critical' ? '🚨' : '⚠️'}
-                </span>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center mr-3 ${
+                  riskLevel === 'critical' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'
+                }`}>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
                 <div>
                   <span className={`font-semibold ${
                     riskLevel === 'critical' ? 'text-red-800' : 'text-orange-800'
@@ -1193,43 +1212,41 @@ const Chat = () => {
       </div>
 
       {/* Input Area */}
-      <div className="bg-white border-t border-gray-200 px-6 py-4">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex items-end space-x-4">
-            <div className="flex-1">
-              <textarea
-                ref={inputRef}
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                onKeyDown={handleKeyPress}
-                placeholder={isVoiceMode ? "Click the mic button to speak..." : "Type your message here..."}
-                className="w-full px-4 py-3 border border-gray-300 rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                rows="1"
-                style={{ maxHeight: '120px' }}
-                disabled={isVoiceMode && !inputMessage}
-                aria-label="Type your message"
-              />
-            </div>
-            
+      <div className="bg-white px-4 sm:px-6 pt-4 pb-8 mx-auto w-full max-w-4xl">
+        <div className="relative flex items-end border border-gray-300 rounded-[24px] bg-white shadow-[0_0_15px_rgba(0,0,0,0.03)] focus-within:shadow-[0_0_15px_rgba(0,0,0,0.08)] transition-shadow">
+          <textarea
+            ref={inputRef}
+            value={inputMessage}
+            onChange={(e) => setInputMessage(e.target.value)}
+            onKeyDown={handleKeyPress}
+            placeholder={isVoiceMode ? "Click the mic button to speak..." : "Type your message here..."}
+            className="w-full pl-6 pr-[110px] py-4 max-h-[150px] resize-none bg-transparent outline-none border-none text-gray-800 placeholder-gray-400"
+            rows="1"
+            style={{ maxHeight: '150px', minHeight: '56px' }}
+            disabled={isVoiceMode && !inputMessage}
+            aria-label="Type your message"
+          />
+          
+          <div className="absolute right-2 bottom-2 flex items-center space-x-1">
             {/* Voice Input Button */}
             {isVoiceMode && (
               <button
                 onClick={startVoiceRecognition}
                 disabled={isListening}
-                className={`p-4 rounded-full transition-all duration-300 transform hover:scale-110 ${
+                className={`p-2.5 rounded-full transition-all duration-300 ${
                   isListening
-                    ? 'bg-red-500 text-white animate-pulse shadow-2xl'
-                    : 'bg-teal-800 text-white hover:bg-teal-900 shadow-xl'
+                    ? 'bg-red-500 text-white animate-pulse'
+                    : 'text-gray-500 hover:bg-gray-100 hover:text-[#466a65]'
                 }`}
                 aria-label="Voice input"
               >
                 {isListening ? (
-                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
                   </svg>
                 ) : (
-                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                   </svg>
                 )}
@@ -1239,29 +1256,29 @@ const Chat = () => {
             <button
               onClick={sendMessage}
               disabled={!inputMessage.trim() || isSending}
-              className={`p-3 rounded-full transition-all duration-200 ${
+              className={`p-2.5 rounded-full transition-all duration-200 flex items-center justify-center ${
                 inputMessage.trim() && !isSending
-                  ? 'bg-teal-800 text-white hover:bg-teal-900 shadow-lg hover:shadow-xl transform hover:scale-105'
-                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  ? 'bg-[#466a65] text-white hover:bg-[#385551] shadow-sm'
+                  : 'bg-[#f4f4f4] text-gray-400 cursor-not-allowed'
               }`}
               aria-label="Send message"
             >
               {isSending ? (
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
               ) : (
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7" />
                 </svg>
               )}
             </button>
           </div>
+        </div>
           
           {!isConnected && !buddyAgentConnected && (
             <div className="mt-2 text-center text-sm text-red-600">
               Services are offline. Please try again later.
             </div>
           )}
-        </div>
       </div>
 
       {/* Crisis Modal */}

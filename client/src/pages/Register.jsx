@@ -1,26 +1,60 @@
-import { useState } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useTranslation } from 'react-i18next'
+import { api } from '../utils/api'
 import image3 from '../assets/illustration_6.png'
 
 const Register = () => {
   const { t } = useTranslation()
+  const location = useLocation()
   const { register, isAuthenticated, isLoading, error } = useAuth()
+  const rawFrom = location.state?.from
+  const from =
+    typeof rawFrom === 'string' && rawFrom.startsWith('/') && rawFrom !== '/login' && rawFrom !== '/register'
+      ? rawFrom
+      : '/'
+  const [organizations, setOrganizations] = useState([])
+  const [orgsLoading, setOrgsLoading] = useState(true)
+  const [orgsError, setOrgsError] = useState('')
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
     confirmPassword: '',
-    collegeId: '',
-    languagePref: 'en',
+    organizationKey: '',
+    memberId: '',
     agreeToTerms: false
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [validationErrors, setValidationErrors] = useState({})
 
+  useEffect(() => {
+    let cancelled = false
+    const loadOrgs = async () => {
+      setOrgsLoading(true)
+      setOrgsError('')
+      try {
+        const res = await api.get('/v1/auth/organizations')
+        if (!cancelled && res.data?.success) {
+          setOrganizations(res.data.organizations || [])
+        }
+      } catch {
+        if (!cancelled) {
+          setOrgsError('Could not load organizations. Refresh the page or try again later.')
+        }
+      } finally {
+        if (!cancelled) setOrgsLoading(false)
+      }
+    }
+    loadOrgs()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   if (isAuthenticated) {
-    return <Navigate to="/" replace />
+    return <Navigate to={from} replace />
   }
 
   const handleChange = (e) => {
@@ -66,12 +100,16 @@ const Register = () => {
       errors.confirmPassword = 'Passwords do not match'
     }
 
-    if (!formData.collegeId.trim()) {
-      errors.collegeId = 'College ID is required'
-    } else if (formData.collegeId.length < 3 || formData.collegeId.length > 20) {
-      errors.collegeId = 'College ID must be between 3 and 20 characters'
-    } else if (!/^[a-zA-Z0-9]+$/.test(formData.collegeId)) {
-      errors.collegeId = 'College ID can only contain letters and numbers'
+    if (!formData.organizationKey.trim()) {
+      errors.organizationKey = 'Please select your organization'
+    }
+
+    if (!formData.memberId.trim()) {
+      errors.memberId = 'Roll number, employee ID, or member ID is required'
+    } else if (formData.memberId.length < 3 || formData.memberId.length > 20) {
+      errors.memberId = 'Must be between 3 and 20 characters'
+    } else if (!/^[a-zA-Z0-9]+$/.test(formData.memberId)) {
+      errors.memberId = 'Only letters and numbers allowed'
     }
 
     if (!formData.agreeToTerms) {
@@ -88,8 +126,12 @@ const Register = () => {
 
     setIsSubmitting(true)
     try {
-      const { confirmPassword, agreeToTerms, ...registrationData } = formData
-      const result = await register(registrationData)
+      const { confirmPassword, agreeToTerms, memberId, organizationKey, ...rest } = formData
+      const result = await register({
+        ...rest,
+        organizationKey: organizationKey.trim(),
+        memberId: memberId.trim()
+      })
       if (result.success) {
         console.log('Registration successful')
       }
@@ -128,8 +170,8 @@ const Register = () => {
 
         <div className="max-w-xl w-full space-y-6">
           <div className="text-center">
-            <h2 className="text-3xl font-bold text-[#2A3F47] mb-2">Student Registration</h2>
-            <p className="text-gray-400">Create your anonymous student account for mental health support</p>
+            <h2 className="text-3xl font-bold text-[#2A3F47] mb-2">Member registration</h2>
+            <p className="text-gray-400">For students, employees, and other members — your organization must register an admin first</p>
           </div>
 
           <form className="space-y-5" onSubmit={handleSubmit}>
@@ -156,6 +198,39 @@ const Register = () => {
               {validationErrors.email && <p className="mt-1 text-sm text-red-600">{validationErrors.email}</p>}
             </div>
 
+            <div>
+              <label htmlFor="organizationKey" className="block text-sm font-medium text-[#2A3F47] mb-2">Organization *</label>
+              <select
+                id="organizationKey"
+                name="organizationKey"
+                required
+                value={formData.organizationKey}
+                onChange={handleChange}
+                disabled={orgsLoading || organizations.length === 0}
+                className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-700 focus:border-transparent transition-all bg-gray-50 hover:bg-white ${
+                  validationErrors.organizationKey ? 'border-red-300' : 'border-gray-200'
+                }`}
+              >
+                <option value="">
+                  {orgsLoading ? 'Loading organizations…' : organizations.length === 0 ? 'No organizations available yet' : 'Select your organization'}
+                </option>
+                {organizations.map((org) => (
+                  <option key={org.organizationKey} value={org.organizationKey}>
+                    {org.name}
+                  </option>
+                ))}
+              </select>
+              {orgsError && <p className="mt-1 text-sm text-red-600">{orgsError}</p>}
+              {validationErrors.organizationKey && (
+                <p className="mt-1 text-sm text-red-600">{validationErrors.organizationKey}</p>
+              )}
+              {!orgsLoading && organizations.length === 0 && !orgsError && (
+                <p className="mt-1 text-xs text-gray-500">
+                  An organization admin must create an account first. Then you can select it here.
+                </p>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label htmlFor="password" className="block text-sm font-medium text-[#2A3F47] mb-2">{t('auth.password')} *</label>
@@ -172,30 +247,11 @@ const Register = () => {
             </div>
 
             <div>
-              <label htmlFor="collegeId" className="block text-sm font-medium text-[#2A3F47] mb-2">Student Roll Number / ID *</label>
-              <input id="collegeId" name="collegeId" type="text" required value={formData.collegeId} onChange={handleChange}
-                className={inputClass('collegeId')} placeholder="Enter your student roll number or ID" />
-              {validationErrors.collegeId && <p className="mt-1 text-sm text-red-600">{validationErrors.collegeId}</p>}
-              <p className="mt-1 text-xs text-gray-400">Your identity remains anonymous — this is only for admin verification</p>
-            </div>
-
-            <div>
-              <label htmlFor="languagePref" className="block text-sm font-medium text-[#2A3F47] mb-2">Language Preference</label>
-              <select id="languagePref" name="languagePref" value={formData.languagePref} onChange={handleChange}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-700 focus:border-transparent transition-all bg-gray-50 hover:bg-white">
-                <option value="en">English</option>
-                <option value="hi">Hindi</option>
-                <option value="te">Telugu</option>
-                <option value="ta">Tamil</option>
-                <option value="bn">Bengali</option>
-                <option value="mr">Marathi</option>
-                <option value="gu">Gujarati</option>
-                <option value="kn">Kannada</option>
-                <option value="ml">Malayalam</option>
-                <option value="or">Odia</option>
-                <option value="pa">Punjabi</option>
-                <option value="as">Assamese</option>
-              </select>
+              <label htmlFor="memberId" className="block text-sm font-medium text-[#2A3F47] mb-2">Roll / employee / member ID *</label>
+              <input id="memberId" name="memberId" type="text" required value={formData.memberId} onChange={handleChange}
+                className={inputClass('memberId')} placeholder="e.g. roll number, employee ID, or staff number" />
+              {validationErrors.memberId && <p className="mt-1 text-sm text-red-600">{validationErrors.memberId}</p>}
+              <p className="mt-1 text-xs text-gray-400">You stay anonymous to peers — your organization uses this only for verification when needed</p>
             </div>
 
             <div className="flex items-center">
@@ -210,7 +266,7 @@ const Register = () => {
             </div>
             {validationErrors.agreeToTerms && <p className="text-sm text-red-600">{validationErrors.agreeToTerms}</p>}
 
-            <button type="submit" disabled={isSubmitting}
+            <button type="submit" disabled={isSubmitting || orgsLoading || organizations.length === 0}
               className="w-full flex justify-center py-3.5 px-4 rounded-xl shadow-lg text-white bg-teal-800 hover:bg-teal-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold transform hover:scale-[1.02] hover:shadow-xl">
               {isSubmitting ? (
                 <>
@@ -226,14 +282,20 @@ const Register = () => {
           <div className="text-center">
             <p className="text-gray-500">
               {t('auth.haveAccount')}{' '}
-              <Link to="/login" className="text-teal-700 hover:text-teal-800 font-semibold transition-colors">{t('auth.login')}</Link>
+              <Link
+                to="/login"
+                state={from !== '/' ? { from } : undefined}
+                className="text-teal-700 hover:text-teal-800 font-semibold transition-colors"
+              >
+                {t('auth.login')}
+              </Link>
             </p>
           </div>
 
           <div className="pt-4 border-t border-gray-100 text-center">
-            <p className="text-sm text-gray-400 mb-3">College Administration?</p>
+            <p className="text-sm text-gray-400 mb-3">Registering your organization?</p>
             <Link to="/admin/signup" className="text-sm text-[#2A3F47] hover:text-teal-800 font-medium transition-colors">
-              Create Admin Account
+              Create admin account
             </Link>
           </div>
         </div>
@@ -249,12 +311,12 @@ const Register = () => {
             Join the<br />Mann-Mitra Community
           </h2>
           <p className="text-base text-[#2A3F47] leading-relaxed mb-8">
-            A safe, anonymous space for students to access mental health support, professional guidance, and peer connections.
+            A safe, anonymous space for members to access mental health support, professional guidance, and peer connections.
           </p>
         </div>
         <img
           src={image3}
-          alt="Student wellness illustration"
+          alt="Wellness illustration"
           className="max-w-[280px] w-full h-auto object-contain"
         />
       </div>

@@ -28,6 +28,18 @@ from app.services.rag_engine import rag_engine
 router = APIRouter()
 
 
+async def _conversation_history_for_session(session_id: str) -> list[dict]:
+    """Prefer MongoDB transcript so RAG/risk survive restarts; fall back to in-process memory."""
+    if settings.MONGO_URI:
+        try:
+            stored = await session_store.get_chat_history_turns(session_id)
+            if stored:
+                return stored
+        except Exception as e:
+            print(f"[Chat] Could not load session history: {e}")
+    return rag_engine.get_session_messages(session_id)
+
+
 # ━━━━━━━━━━━━━━━━━━━━ Health ━━━━━━━━━━━━━━━━━━━━
 
 @router.get("/health", response_model=HealthResponse)
@@ -39,6 +51,7 @@ async def health_check():
         services={
             "vector_store": vs_stats,
             "gemini_configured": settings.has_gemini,
+            "openrouter_configured": settings.has_openrouter,
             "mongodb_configured": bool(settings.MONGO_URI),
         },
     )
@@ -54,10 +67,12 @@ async def chat(req: ChatRequest):
     """
     session_id = req.session_id or f"session_{uuid.uuid4().hex[:12]}"
 
+    history = await _conversation_history_for_session(session_id)
     result = await decision_engine.process_message(
         message=req.message,
         session_id=session_id,
         user_id=req.user_id,
+        conversation_history=history,
     )
 
     # Persist interaction to MongoDB
@@ -104,10 +119,12 @@ async def chat_text(req: ChatRequest):
     """Simplified text-only endpoint matching existing Buddy agent interface."""
     session_id = req.session_id or f"text_session_{uuid.uuid4().hex[:8]}"
 
+    history = await _conversation_history_for_session(session_id)
     result = await decision_engine.process_message(
         message=req.message,
         session_id=session_id,
         user_id=req.user_id,
+        conversation_history=history,
     )
 
     try:

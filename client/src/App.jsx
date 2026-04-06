@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import Header from './components/Header'
 import ErrorBoundary from './components/ErrorBoundary'
 import RoleProtectedRoute from './components/auth/RoleProtectedRoute'
+import StudentProtectedRoute from './components/auth/StudentProtectedRoute'
+import StudentOrCounsellorRoute from './components/auth/StudentOrCounsellorRoute'
 import Home from './pages/Home'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -42,7 +44,23 @@ function App() {
         {/* Dashboard routes - protected by role, no header */}
         <Route path="/admin/dashboard" element={<RoleProtectedRoute requiredRole="admin"><AdminDashboardNew /></RoleProtectedRoute>} />
         <Route path="/counsellor/dashboard" element={<RoleProtectedRoute requiredRole="counsellor"><CounsellorDashboard /></RoleProtectedRoute>} />
-        <Route path="/chat-platform" element={<ChatPlatform />} />
+        <Route path="/chat-platform" element={
+          <StudentOrCounsellorRoute>
+            <ChatPlatform />
+          </StudentOrCounsellorRoute>
+        } />
+        
+        {/* Chat route - full viewport without footer */}
+        <Route path="/chat" element={
+          <StudentProtectedRoute>
+            <div className="flex flex-col h-screen overflow-hidden">
+              <Header />
+              <div className="flex-1 relative overflow-hidden bg-white">
+                <Chat />
+              </div>
+            </div>
+          </StudentProtectedRoute>
+        } />
         
         {/* Main app routes - with header and footer */}
         <Route path="*" element={
@@ -56,22 +74,21 @@ function App() {
                 <Route path="/admin/signup" element={<AdminSignup />} />
                 <Route path="/counsellor/login" element={<CounsellorLogin />} />
                 <Route path="/" element={<Home />} />
-                <Route path="/screening" element={<Screening />} />
+                <Route path="/screening" element={<StudentProtectedRoute><Screening /></StudentProtectedRoute>} />
                 <Route path="/screenings/history" element={<RoleProtectedRoute requiredRole="student"><ScreeningHistory /></RoleProtectedRoute>} />
                 <Route path="/dashboard" element={<RoleProtectedRoute requiredRole="student"><StudentDashboard /></RoleProtectedRoute>} />
-                <Route path="/chat" element={<Chat />} />
-                <Route path="/booking" element={<Booking />} />
-                <Route path="/appointments" element={<Appointments />} />
-                <Route path="/appointments/:id" element={<AppointmentDetails />} />
-                <Route path="/forum" element={<ErrorBoundary><Forum /></ErrorBoundary>} />
+                <Route path="/booking" element={<StudentProtectedRoute><Booking /></StudentProtectedRoute>} />
+                <Route path="/appointments" element={<StudentProtectedRoute><Appointments /></StudentProtectedRoute>} />
+                <Route path="/appointments/:id" element={<StudentProtectedRoute><AppointmentDetails /></StudentProtectedRoute>} />
+                <Route path="/forum" element={<StudentProtectedRoute><ErrorBoundary><Forum /></ErrorBoundary></StudentProtectedRoute>} />
                 <Route path="/moderator" element={<Moderator />} />
                 <Route path="/admin" element={<Admin />} />
                 <Route path='/about' element={<About />} />
-                <Route path='/resources' element = {<Resources/>} />
-                <Route path='/certification/course/:courseId' element = {<CertificationCourse/>} />
-                <Route path='/certification/exam' element = {<CertificationExam/>} />
-                <Route path='/certification/schedule-exam' element = {<ScheduleExam/>} />
-                <Route path='/certification/schedule-interview' element = {<ScheduleInterview/>} />
+                <Route path='/resources' element={<StudentProtectedRoute><Resources /></StudentProtectedRoute>} />
+                <Route path='/certification/course/:courseId' element={<StudentProtectedRoute><CertificationCourse /></StudentProtectedRoute>} />
+                <Route path='/certification/exam' element={<StudentProtectedRoute><CertificationExam /></StudentProtectedRoute>} />
+                <Route path='/certification/schedule-exam' element={<StudentProtectedRoute><ScheduleExam /></StudentProtectedRoute>} />
+                <Route path='/certification/schedule-interview' element={<StudentProtectedRoute><ScheduleInterview /></StudentProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </main>

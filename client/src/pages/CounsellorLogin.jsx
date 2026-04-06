@@ -45,8 +45,11 @@ const CounsellorLogin = () => {
         console.log('Storing counsellor user:', user)
         
         localStorage.setItem('Mann-Mitra_token', token)
-        localStorage.setItem('user', JSON.stringify(user))
-        
+        localStorage.setItem('token', token)
+        const userJson = JSON.stringify(user)
+        localStorage.setItem('user', userJson)
+        localStorage.setItem('Mann-Mitra_user', userJson)
+
         navigate('/counsellor/dashboard')
       } else {
         const serverResponse = response.data || response
@@ -138,7 +141,7 @@ const CounsellorLogin = () => {
 
           <div className="text-center">
             <Link to="/login" className="text-sm text-[#2A3F47] hover:text-teal-800 font-medium transition-colors">
-              ← Back to Student Login
+              ← Back to member sign in
             </Link>
           </div>
 

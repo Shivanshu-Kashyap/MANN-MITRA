@@ -91,7 +91,10 @@ class DecisionEngine:
         Main entry point. Runs RAG retrieval and risk detection in parallel,
         then routes through the decision tree.
         """
-        history = conversation_history or rag_engine.get_session_messages(session_id)
+        if conversation_history is not None:
+            history = conversation_history
+        else:
+            history = rag_engine.get_session_messages(session_id)
 
         # ── Parallel execution: RAG + Risk Detection ──
         risk_indicators = risk_detector.analyze(message, history)
@@ -103,6 +106,7 @@ class DecisionEngine:
             session_id=session_id,
             risk_level=risk_assessment.risk_level.value,
             topic_hint=topic_hint,
+            prior_messages=history,
         )
 
         # ── Decision routing ──
@@ -277,8 +281,22 @@ class DecisionEngine:
     def _detect_topic_hint(message: str) -> Optional[str]:
         """Topic hints aligned with vector store metadata for better retrieval."""
         lower = message.lower()
+        # Phrase-style cues for topic routing only (risk detection is separate). Avoid bare "die"/"kill"
+        # so casual wording does not force crisis-only retrieval.
         topics = {
-            "crisis": ["suicide", "self-harm", "kill", "die", "end my life", "suicidal", "988", "crisis"],
+            "crisis": [
+                "suicide",
+                "suicidal",
+                "self-harm",
+                "self harm",
+                "kill myself",
+                "killing myself",
+                "end my life",
+                "want to die",
+                "better off dead",
+                "988",
+                "crisis",
+            ],
             "anxiety": ["anxious", "anxiety", "worried", "nervous", "panic", "panic attack", "worried"],
             "depression": ["depressed", "depression", "sad", "hopeless", "empty", "low mood"],
             "stress": ["stress", "overwhelmed", "pressure", "burnout", "stressed"],

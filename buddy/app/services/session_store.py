@@ -9,6 +9,19 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from app.config import settings
 
 
+def normalize_stored_messages(raw: Optional[list]) -> list[dict]:
+    """Strip Mongo message docs to role/content for LLM + risk history."""
+    out = []
+    for m in raw or []:
+        role = m.get("role")
+        if role not in ("user", "assistant"):
+            continue
+        content = (m.get("content") or "").strip()
+        if content:
+            out.append({"role": role, "content": content})
+    return out
+
+
 class SessionStore:
     def __init__(self):
         self._client: Optional[AsyncIOMotorClient] = None
@@ -108,6 +121,14 @@ class SessionStore:
         return await self._db["chat_sessions"].find_one(
             {"session_id": session_id}, {"_id": 0}
         )
+
+    async def get_chat_history_turns(self, session_id: str) -> list[dict]:
+        """Prior turns for RAG/risk (excludes the message not yet saved for this request)."""
+        doc = await self.get_session(session_id)
+        if not doc:
+            return []
+        msgs = normalize_stored_messages(doc.get("messages"))
+        return msgs[-settings.MAX_HISTORY_LENGTH :]
 
     async def get_high_risk_sessions(self, limit: int = 50) -> list[dict]:
         if self._db is None:

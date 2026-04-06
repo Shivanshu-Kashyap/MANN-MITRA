@@ -162,7 +162,7 @@ const AdminLogin = () => {
               </Link>
             </p>
             <Link to="/login" className="block text-sm text-[#2A3F47] hover:text-teal-800 font-medium transition-colors">
-              ← Back to Student Login
+              ← Back to member sign in
             </Link>
           </div>
 

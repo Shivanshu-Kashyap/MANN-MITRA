@@ -115,8 +115,10 @@ const storage = {
   
   getUser: () => {
     try {
-      const userData = localStorage.getItem(USER_KEY)
-      return userData ? JSON.parse(userData) : null
+      const fromPrimary = localStorage.getItem(USER_KEY)
+      if (fromPrimary) return JSON.parse(fromPrimary)
+      const legacy = localStorage.getItem('user')
+      return legacy ? JSON.parse(legacy) : null
     } catch (error) {
       console.error('Error getting user from storage:', error)
       return null
@@ -139,6 +141,8 @@ const storage = {
     try {
       localStorage.removeItem(TOKEN_KEY)
       localStorage.removeItem(USER_KEY)
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
     } catch (error) {
       console.error('Error clearing storage:', error)
     }
@@ -233,7 +237,12 @@ export const AuthProvider = ({ children }) => {
       
       return { success: true, user, token }
     } catch (error) {
-      const errorMessage = error.response?.data?.message || 'Registration failed'
+      const data = error.response?.data || error.originalError?.response?.data
+      const errList = data?.errors
+      const errorMessage =
+        Array.isArray(errList) && errList.length
+          ? errList.map((e) => e.msg || e.message).join('. ')
+          : (data?.message || error.message || 'Registration failed')
       dispatch({
         type: AUTH_ACTIONS.LOGIN_FAILURE,
         payload: errorMessage

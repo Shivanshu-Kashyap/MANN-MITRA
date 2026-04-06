@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useTranslation } from 'react-i18next'
 import image1 from '../assets/illustration_1.png'
 
 const Login = () => {
   const { t } = useTranslation()
+  const location = useLocation()
+  const navigate = useNavigate()
   const { login, isAuthenticated, isLoading, error } = useAuth()
   const [formData, setFormData] = useState({
     email: '',
@@ -13,8 +15,14 @@ const Login = () => {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  const rawFrom = location.state?.from
+  const from =
+    typeof rawFrom === 'string' && rawFrom.startsWith('/') && rawFrom !== '/login' && rawFrom !== '/register'
+      ? rawFrom
+      : '/'
+
   if (isAuthenticated) {
-    return <Navigate to="/" replace />
+    return <Navigate to={from} replace />
   }
 
   const handleChange = (e) => {
@@ -32,7 +40,7 @@ const Login = () => {
     try {
       const result = await login(formData)
       if (result.success) {
-        console.log('Login successful')
+        navigate(from, { replace: true })
       }
     } catch (error) {
       console.error('Login error:', error)
@@ -85,10 +93,10 @@ const Login = () => {
         <div className="max-w-md w-full space-y-8">
           <div className="text-center">
             <h2 className="text-3xl font-bold text-[#2A3F47] mb-2">
-              {t('auth.login')}
+              {t('auth.memberSignIn')}
             </h2>
             <p className="text-gray-400">
-              Sign in to your account to continue
+              For students, employees, and other members — use your organization registration
             </p>
           </div>
 
@@ -173,7 +181,11 @@ const Login = () => {
           <div className="text-center">
             <p className="text-gray-500">
               {t('auth.noAccount')}{' '}
-              <Link to="/register" className="text-teal-700 hover:text-teal-800 font-semibold transition-colors">
+              <Link
+                to="/register"
+                state={from !== '/' ? { from } : undefined}
+                className="text-teal-700 hover:text-teal-800 font-semibold transition-colors"
+              >
                 {t('auth.signup')}
               </Link>
             </p>

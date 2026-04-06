@@ -84,7 +84,8 @@
     }
   },
   "auth": {
-    "login": "लॉग इन",
+    "login": "साइन इन",
+    "memberSignIn": "सदस्य साइन इन",
     "signup": "साइन अप",
     "logout": "लॉग आउट",
     "email": "ईमेल",

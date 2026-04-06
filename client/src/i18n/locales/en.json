@@ -89,7 +89,8 @@
     }
   },
   "auth": {
-    "login": "Login",
+    "login": "Sign in",
+    "memberSignIn": "Member sign in",
     "signup": "Sign Up",
     "logout": "Logout",
     "email": "Email",

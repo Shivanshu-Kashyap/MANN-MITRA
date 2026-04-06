@@ -38,6 +38,7 @@ const sendTokenResponse = (user, statusCode, res, message) => {
         name: user.name,
         anonymousDisplayName: user.anonymousDisplayName,
         collegeId: user.collegeId,
+        organizationKey: user.organizationKey,
         role: user.role,
         languagePref: user.languagePref,
         createdAt: user.createdAt
@@ -60,7 +61,8 @@ const register = async (req, res, next) => {
       });
     }
 
-    const { email, password, name, collegeId, languagePref } = req.body;
+    const { email, password, name, organizationKey, languagePref } = req.body;
+    const memberId = (req.body.memberId || req.body.collegeId || '').trim();
 
     // Only allow student registration through public route
     const role = 'student';
@@ -74,12 +76,25 @@ const register = async (req, res, next) => {
       });
     }
 
-    // Create user
+    const orgAdmin = await User.findOne({
+      role: 'admin',
+      collegeId: organizationKey,
+      isActive: true
+    });
+    if (!orgAdmin) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or inactive organization. Choose an organization from the list.'
+      });
+    }
+
+    // Create user (collegeId stores roll / employee / member ID for verification)
     const user = await User.create({
       email,
       passwordHash: password, // Will be hashed by pre-save hook
       name,
-      collegeId,
+      collegeId: memberId,
+      organizationKey,
       role,
       languagePref: languagePref || 'en'
     });
@@ -87,7 +102,7 @@ const register = async (req, res, next) => {
     // Update last login
     await user.updateLastLogin();
 
-    sendTokenResponse(user, 201, res, 'Student registered successfully');
+    sendTokenResponse(user, 201, res, 'Registration successful');
 
   } catch (error) {
     console.error('Register error:', error);
@@ -244,7 +259,8 @@ const adminSignup = async (req, res, next) => {
       });
     }
 
-    const { collegeName, email, phoneNumber, department, collegeCode, password } = req.body;
+    const organizationName = (req.body.organizationName ?? req.body.collegeName ?? '').trim();
+    const { email, phoneNumber, department, collegeCode, password } = req.body;
 
     // Check if admin already exists
     let existingUser = await User.findByEmail(email);
@@ -263,7 +279,7 @@ const adminSignup = async (req, res, next) => {
     const user = await User.create({
       email,
       passwordHash: password, // Will be hashed by pre-save hook
-      name: collegeName, // Use college name as the admin name
+      name: organizationName,
       collegeId: adminId,
       role: 'admin',
       department,
@@ -308,6 +324,34 @@ const adminSignup = async (req, res, next) => {
   }
 };
 
+// @desc    List organizations registered by admins (for member signup)
+// @route   GET /api/v1/auth/organizations
+// @access  Public
+const listOrganizations = async (req, res) => {
+  try {
+    const admins = await User.find({ role: 'admin', isActive: true })
+      .select('name collegeId')
+      .sort({ name: 1 })
+      .lean();
+
+    const organizations = admins.map((a) => ({
+      organizationKey: a.collegeId,
+      name: a.name
+    }));
+
+    res.status(200).json({
+      success: true,
+      organizations
+    });
+  } catch (error) {
+    console.error('List organizations error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Could not load organizations'
+    });
+  }
+};
+
 // @desc    Login user
 // @route   POST /api/v1/auth/login
 // @access  Public
@@ -331,6 +375,13 @@ const login = async (req, res, next) => {
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
+      });
+    }
+
+    if (user.role !== 'student') {
+      return res.status(401).json({
+        success: false,
+        message: 'Use Admin or Counsellor login for staff accounts.'
       });
     }
 
@@ -464,5 +515,6 @@ module.exports = {
   updateProfile,
   adminLogin,
   counsellorLogin,
-  adminSignup
+  adminSignup,
+  listOrganizations
 };

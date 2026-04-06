@@ -28,8 +28,14 @@ const userSchema = new mongoose.Schema({
   },
   collegeId: {
     type: String,
-    required: [true, 'College ID is required'],
+    required: [true, 'Member or staff ID is required'],
     trim: true
+  },
+  /** For students: admin account token (e.g. ADMIN0001) linking the member to an organization */
+  organizationKey: {
+    type: String,
+    trim: true,
+    default: null
   },
   role: {
     type: String,

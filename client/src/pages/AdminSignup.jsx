@@ -1,20 +1,18 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
 import image5 from '../assets/illustration.png'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
 const AdminSignup = () => {
-  const { t } = useTranslation()
   const navigate = useNavigate()
   
   const [formData, setFormData] = useState({
-    collegeName: '',
+    organizationName: '',
     email: '',
     phoneNumber: '',
     department: '',
-    collegeCode: '',
+    organizationCode: '',
     password: '',
     confirmPassword: ''
   })
@@ -71,11 +69,11 @@ const AdminSignup = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          collegeName: formData.collegeName.trim(),
+          organizationName: formData.organizationName.trim(),
           email: formData.email.trim().toLowerCase(),
           phoneNumber: formData.phoneNumber.replace(/\D/g, '').slice(0, 10),
           department: formData.department,
-          ...(formData.collegeCode?.trim() && { collegeCode: formData.collegeCode.trim() }),
+          ...(formData.organizationCode?.trim() && { collegeCode: formData.organizationCode.trim() }),
           password: formData.password
         })
       })
@@ -112,7 +110,7 @@ const AdminSignup = () => {
 
           <div className="text-center">
             <h2 className="text-3xl font-bold text-[#2A3F47] mb-2">Admin Registration</h2>
-            <p className="text-gray-400">Create an administrative account for your institution</p>
+            <p className="text-gray-400">Create an administrative account for your school, company, or other organization</p>
           </div>
 
           <form className="space-y-4" onSubmit={handleSubmit}>
@@ -129,16 +127,16 @@ const AdminSignup = () => {
             )}
 
             <div>
-              <label htmlFor="collegeName" className="block text-sm font-medium text-[#2A3F47] mb-2">College/Institution Name *</label>
-              <input id="collegeName" name="collegeName" type="text" required className={inputClass}
-                placeholder="Enter your college/institution name" value={formData.collegeName} onChange={handleChange} />
+              <label htmlFor="organizationName" className="block text-sm font-medium text-[#2A3F47] mb-2">Organization name *</label>
+              <input id="organizationName" name="organizationName" type="text" required className={inputClass}
+                placeholder="School, company, or organization name" value={formData.organizationName} onChange={handleChange} />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-[#2A3F47] mb-2">College Email ID *</label>
+                <label htmlFor="email" className="block text-sm font-medium text-[#2A3F47] mb-2">Work email *</label>
                 <input id="email" name="email" type="email" required className={inputClass}
-                  placeholder="admin@college.edu" value={formData.email} onChange={handleChange} />
+                  placeholder="admin@yourorganization.org" value={formData.email} onChange={handleChange} />
               </div>
               <div>
                 <label htmlFor="phoneNumber" className="block text-sm font-medium text-[#2A3F47] mb-2">Phone Number *</label>
@@ -156,9 +154,9 @@ const AdminSignup = () => {
                 </select>
               </div>
               <div>
-                <label htmlFor="collegeCode" className="block text-sm font-medium text-[#2A3F47] mb-2">College Code</label>
-                <input id="collegeCode" name="collegeCode" type="text" className={inputClass}
-                  placeholder="Registration code (optional)" value={formData.collegeCode} onChange={handleChange} />
+                <label htmlFor="organizationCode" className="block text-sm font-medium text-[#2A3F47] mb-2">Organization code</label>
+                <input id="organizationCode" name="organizationCode" type="text" className={inputClass}
+                  placeholder="Internal reference (optional)" value={formData.organizationCode} onChange={handleChange} />
               </div>
             </div>
 
@@ -207,7 +205,7 @@ const AdminSignup = () => {
               <Link to="/admin/login" className="text-teal-700 hover:text-teal-800 font-semibold transition-colors">Sign in here</Link>
             </p>
             <Link to="/register" className="block text-sm text-[#2A3F47] hover:text-teal-800 font-medium transition-colors">
-              ← Student Registration
+              ← Member registration
             </Link>
           </div>
         </div>
@@ -223,7 +221,7 @@ const AdminSignup = () => {
             Set Up Your<br />Institution
           </h2>
           <p className="text-base text-[#2A3F47] leading-relaxed mb-8">
-            Register your institution to enable mental health support services for your students through the Mann-Mitra platform.
+            Register your organization so members can join and access mental health support through Mann-Mitra.
           </p>
         </div>
         <img

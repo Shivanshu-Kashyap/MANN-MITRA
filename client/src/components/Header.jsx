@@ -51,28 +51,28 @@ const Header = () => {
         <div className="flex items-center justify-between h-14 md:h-16">
 
           {/* Logo as Home Link */}
-          <Link to="/" className="flex items-center gap-2 flex-shrink-0">
+          <Link to="/" className="flex items-center gap-3 flex-shrink-0">
             <img 
               src={logoImage} 
-              alt="Mann-Mitra" 
-              className="h-20 md:h-22 w-auto object-contain cursor-pointer hover:opacity-90 transition-opacity"
+              alt="Mann-Mitra Logo" 
+              className="h-10 md:h-12 w-auto object-contain cursor-pointer hover:opacity-90 transition-opacity"
             />
+            <span className="text-xl md:text-[22px] font-bold text-[#466a65] tracking-tight">Mann-Mitra</span>
           </Link>
 
           {/* Navbar links - centered */}
-          <nav className="hidden md:flex flex-1 items-center justify-center gap-1">
+          <nav className="hidden md:flex flex-1 items-center justify-center gap-5 lg:gap-8 xl:gap-10">
             {navItems.map((item) => (
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200
+                className={`px-1 py-1 text-[15px] font-medium transition-all duration-200
                   ${isActivePath(item.path)
-                    ? 'bg-teal-50 text-teal-700'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}
+                    ? 'text-[#466a65] border-b-2 border-[#466a65]'
+                    : 'text-gray-500 hover:text-[#466a65]'}
                   `}
               >
-                {item.icon}
-                <span>{item.label}</span>
+                {item.label}
               </Link>
             ))}
           </nav>
@@ -119,7 +119,7 @@ const Header = () => {
             ) : (
               <Link
                 to="/login"
-                className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition font-medium text-sm"
+                className="flex items-center gap-2 px-6 py-2.5 bg-[#466a65] text-white hover:bg-[#385551] shadow-sm rounded-lg transition font-medium text-sm"
               >
                 <span>{t('auth.login')}</span>
                 <FiArrowRight className="w-4 h-4" />
@@ -149,26 +149,24 @@ const Header = () => {
                 key={item.path}
                 to={item.path}
                 onClick={() => setIsMenuOpen(false)}
-                className={`flex items-center space-x-2 px-4 py-3 rounded-lg text-base font-medium transition-all duration-200 ${
+                className={`block px-4 py-3 rounded-lg text-base font-medium transition-all duration-200 ${
                   isActivePath(item.path)
-                    ? 'bg-teal-100 text-teal-700 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                    ? 'bg-[#466a65]/10 text-[#466a65]'
+                    : 'text-gray-600 hover:text-[#466a65] hover:bg-gray-50'
                 }`}
               >
-                {item.icon}
-                <span>{item.label}</span>
+                {item.label}
               </Link>
             ))}
             {!isAuthenticated && (
               <button
-                className="flex items-center px-4 py-3 w-full text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+                className="block w-full text-left px-4 py-3 text-base font-medium text-gray-600 hover:text-[#466a65] hover:bg-gray-50 rounded-lg transition-all"
                 onClick={() => {
                   setIsMenuOpen(false)
                   navigate('/about')
                 }}
               >
-                <FiHelpCircle className="mr-2" />
-                <span>{t('nav.about')}</span>
+                {t('nav.about')}
               </button>
             )}
             <div className="px-4 py-2">
@@ -176,14 +174,13 @@ const Header = () => {
             </div>
             {!isAuthenticated && (
               <button
-                className="flex items-center px-4 py-3 w-full text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+                className="block w-full text-left px-4 py-3 text-base font-medium text-gray-600 hover:text-[#466a65] hover:bg-gray-50 rounded-lg transition-all"
                 onClick={() => {
                   setIsMenuOpen(false)
                   navigate('/login')
                 }}
               >
-                <FiLogIn className="mr-2" />
-                <span>{t('auth.login')}</span>
+                {t('auth.login')}
               </button>
             )}
           </nav>

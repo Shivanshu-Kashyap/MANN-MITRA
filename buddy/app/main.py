@@ -23,7 +23,8 @@ async def lifespan(app: FastAPI):
     vector_store.initialize()
     await session_store.connect()
 
-    print(f"  Gemini configured: {settings.has_gemini}")
+    print(f"  Gemini configured:    {settings.has_gemini}")
+    print(f"  OpenRouter configured: {settings.has_openrouter} ({settings.OPENROUTER_MODEL})")
     print(f"  Vector DB docs:    {vector_store.get_stats()['total_documents']}")
     print(f"  Node.js server:    {settings.NODE_SERVER_URL}")
     print("=" * 60)
