@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import logoImage from '../assets/Mann-mitra.png'
 import { useApi } from '../hooks/useApi'
+import { BUDDY_AGENT_URL } from '../utils/api'
 import { clearStoredAuth } from '../utils/routeAuth'
 
 const AdminDashboardNew = () => {
@@ -311,8 +312,7 @@ const RiskDashboardTab = () => {
 
   const fetchRiskDashboard = async () => {
     try {
-      const buddyUrl = import.meta.env.VITE_BUDDY_AGENT_URL || 'http://localhost:8000'
-      const response = await fetch(`${buddyUrl}/admin/risk-dashboard`)
+      const response = await fetch(`${BUDDY_AGENT_URL}/admin/risk-dashboard`)
       if (response.ok) {
         const data = await response.json()
         setDashboardData(data)

@@ -14,7 +14,7 @@ export default defineConfig({
       
       // Workbox configuration for advanced caching strategies
       workbox: {
-        // Include all static assets in precache
+        maximumFileSizeToCacheInBytes: 7 * 1024 * 1024,
         globPatterns: [
           '**/*.{js,css,html,ico,png,svg,webp,jpg,jpeg,json}',
           'assets/**/*',

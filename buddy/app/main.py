@@ -11,6 +11,8 @@ from app.config import settings
 from app.api.routes import router
 from app.services.vector_store import vector_store
 from app.services.session_store import session_store
+from app.services.risk_semantic_scorer import risk_semantic_scorer
+from app.services.risk_detector import RiskDetector
 
 
 @asynccontextmanager
@@ -23,8 +25,16 @@ async def lifespan(app: FastAPI):
     vector_store.initialize()
     await session_store.connect()
 
+    if settings.RISK_SEMANTIC_ENABLED:
+        risk_semantic_scorer.initialize()
+
+    if settings.RISK_CALIBRATE_WEIGHTS:
+        RiskDetector.calibrate()
+
     print(f"  Gemini configured:    {settings.has_gemini}")
     print(f"  OpenRouter configured: {settings.has_openrouter} ({settings.OPENROUTER_MODEL})")
+    print(f"  Risk LLM enabled:     {settings.RISK_LLM_ENABLED}")
+    print(f"  Risk Semantic enabled: {settings.RISK_SEMANTIC_ENABLED}")
     print(f"  Vector DB docs:    {vector_store.get_stats()['total_documents']}")
     print(f"  Node.js server:    {settings.NODE_SERVER_URL}")
     print("=" * 60)

@@ -5,6 +5,12 @@ LOW      → supportive RAG advice, self-help, journaling
 MEDIUM   → coping strategies, optional counselling recommendation
 HIGH     → strongly recommend counselling, notify counsellor dashboard
 CRITICAL → crisis module, grounding response, emergency helpline, admin alert
+
+Risk assessment pipeline (runs per message):
+  1. Rule-based keyword analysis (sync, ~1 ms)
+  2. LLM clinical risk assessment  ← runs IN PARALLEL with RAG (adds ~0 extra latency)
+  3. Semantic similarity scoring (sync, ~10 ms)
+  4. Ensemble: conservative max across all available signals
 """
 
 import asyncio
@@ -12,6 +18,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
+from app.config import settings
 from app.models.schemas import (
     RiskLevel,
     RiskAssessment,
@@ -20,10 +27,13 @@ from app.models.schemas import (
     CrisisResponse,
     SessionType,
     AdminAlert,
+    LLMRiskSignal,
 )
 from app.services.rag_engine import rag_engine
 from app.services.risk_detector import risk_detector
 from app.services.risk_scorer import risk_scorer
+from app.services.risk_llm_scorer import risk_llm_scorer
+from app.services.risk_semantic_scorer import risk_semantic_scorer
 
 
 COPING_EXERCISES = {
@@ -75,7 +85,7 @@ CRISIS_HELPLINES = {
 
 
 class DecisionEngine:
-    """Orchestrates RAG + Risk Detection in parallel and routes based on risk level."""
+    """Orchestrates RAG + multi-signal risk assessment in parallel and routes based on risk level."""
 
     def __init__(self):
         self._pending_alerts: list[AdminAlert] = []
@@ -88,28 +98,57 @@ class DecisionEngine:
         conversation_history: list[dict] = None,
     ) -> DecisionResult:
         """
-        Main entry point. Runs RAG retrieval and risk detection in parallel,
-        then routes through the decision tree.
+        Main entry point.
+        1) Rule-based keyword extraction (sync, instant)
+        2) LLM risk assessment + RAG response generation (async, parallel)
+        3) Semantic similarity scoring (sync, ~10 ms)
+        4) Ensemble scoring across all signals
+        5) Decision routing
         """
         if conversation_history is not None:
             history = conversation_history
         else:
             history = rag_engine.get_session_messages(session_id)
 
-        # ── Parallel execution: RAG + Risk Detection ──
-        risk_indicators = risk_detector.analyze(message, history)
-        risk_assessment = risk_scorer.score(risk_indicators)
+        # ── Step 1: Fast rule-based analysis (used for RAG prompt hint) ──
+        rule_indicators = risk_detector.analyze(message, history)
+        rule_preliminary = risk_scorer._compute_rule_score(rule_indicators)
+        preliminary_level = (
+            "critical" if rule_preliminary >= settings.RISK_THRESHOLD_CRITICAL
+            else "high" if rule_preliminary >= settings.RISK_THRESHOLD_HIGH
+            else "medium" if rule_preliminary >= settings.RISK_THRESHOLD_MEDIUM
+            else "low"
+        )
 
+        # ── Step 2: Parallel — LLM risk assessment + RAG generation ──
         topic_hint = self._detect_topic_hint(message)
-        rag_result = await rag_engine.generate_response(
+
+        rag_coro = rag_engine.generate_response(
             user_message=message,
             session_id=session_id,
-            risk_level=risk_assessment.risk_level.value,
+            risk_level=preliminary_level,
             topic_hint=topic_hint,
             prior_messages=history,
         )
 
-        # ── Decision routing ──
+        llm_signal: Optional[LLMRiskSignal] = None
+        if settings.RISK_LLM_ENABLED:
+            llm_coro = risk_llm_scorer.assess(message, history)
+            rag_result, llm_signal = await asyncio.gather(rag_coro, llm_coro)
+        else:
+            rag_result = await rag_coro
+
+        # ── Step 3: Semantic similarity (~10 ms, sync) ──
+        semantic_signal = None
+        if settings.RISK_SEMANTIC_ENABLED:
+            semantic_signal = risk_semantic_scorer.score(message)
+
+        # ── Step 4: Ensemble scoring ──
+        risk_assessment = risk_scorer.ensemble_score(
+            rule_indicators, llm_signal, semantic_signal,
+        )
+
+        # ── Step 5: Decision routing ──
         if risk_assessment.risk_level == RiskLevel.CRITICAL:
             return await self._handle_critical(
                 rag_result, risk_assessment, session_id, user_id
@@ -281,8 +320,6 @@ class DecisionEngine:
     def _detect_topic_hint(message: str) -> Optional[str]:
         """Topic hints aligned with vector store metadata for better retrieval."""
         lower = message.lower()
-        # Phrase-style cues for topic routing only (risk detection is separate). Avoid bare "die"/"kill"
-        # so casual wording does not force crisis-only retrieval.
         topics = {
             "crisis": [
                 "suicide",

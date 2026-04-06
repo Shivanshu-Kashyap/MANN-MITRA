@@ -1,6 +1,6 @@
 # Buddy — RAG Mental Health Chatbot Service
 
-A FastAPI-based microservice that powers the Mann-Mitra mental health chatbot with **Retrieval-Augmented Generation (RAG)**, **risk detection**, **counsellor recommendations**, and **admin crisis alerts**.
+A FastAPI-based microservice that powers the Mann-Mitra mental health chatbot with **Retrieval-Augmented Generation (RAG)**, **multi-signal ensemble risk assessment** (rule-based + LLM-as-Judge + semantic similarity), **counsellor recommendations**, and **admin crisis alerts**.
 
 This README explains **the full runtime flow**, **where each piece of logic lives**, and **workflow diagrams** so a new developer or reviewer can understand the system end to end.
 
@@ -57,11 +57,15 @@ The following applies to **`POST /chat`** and **`POST /chat/text`** (same core l
    - If Mongo returns nothing or errors, fall back to **`rag_engine`** in-memory messages for that session.
 3. Call **`decision_engine.process_message(..., conversation_history=history)`**.
 
-### Step 2 — Risk assessment (`app/services/decision_engine.py` → `risk_detector` + `risk_scorer`)
+### Step 2 — Multi-signal risk assessment (`decision_engine` → detector + LLM + semantic + ensemble)
 
-1. **`risk_detector.analyze(message, history)`** — keyword dictionaries (including Hinglish variants), emotional amplifiers, repetition across the thread, and historical trend signals. Produces **`RiskIndicators`**.
-2. **`risk_scorer.score(indicators)`** — weighted blend → **score 0–100** and **`RiskLevel`**: low / medium / high / critical (thresholds from `.env`).
-3. **`_detect_topic_hint(message)`** — lightweight keyword→topic mapping (e.g. anxiety, stress, crisis) used only to **bias vector search**, not to replace clinical risk logic.
+Risk assessment runs as a **three-signal ensemble** with conservative-max aggregation:
+
+1. **Signal 1 — Rule-based** (`risk_detector.analyze(message, history)`) — keyword dictionaries (including Hinglish variants), emotional amplifiers, repetition across the thread, and historical trend signals. Produces **`RiskIndicators`**. Max-based scoring (the single most severe indicator drives the score — no dilution from weighted averages).
+2. **Signal 2 — LLM clinical assessment** (`risk_llm_scorer.assess(message, history)`) — sends the message + conversation context to Gemini/OpenRouter with a clinical triage prompt (`temperature=0`). Returns structured scores for suicidal ideation, self-harm risk, crisis severity, emotional distress, and hopelessness. Runs **in parallel** with RAG generation via `asyncio.gather` so it adds ~0 extra latency.
+3. **Signal 3 — Semantic similarity** (`risk_semantic_scorer.score(message)`) — cosine similarity between the user message embedding and curated clinical reference phrases for crisis, self-harm, severe distress, and moderate distress categories. Uses the same SentenceTransformer model (`all-MiniLM-L6-v2`) already loaded for RAG. ~10 ms per message.
+4. **Ensemble** (`risk_scorer.ensemble_score(...)`) — `final_score = max(rule_score, llm_score, semantic_score)`. Conservative: if **any** signal indicates HIGH/CRITICAL, the system acts. Multi-signal agreement boosts confidence. Hard overrides preserved for explicit crisis keywords.
+5. **`_detect_topic_hint(message)`** — lightweight keyword→topic mapping (e.g. anxiety, stress, crisis) used only to **bias vector search**, not to replace clinical risk logic.
 
 ### Step 3 — RAG generation (`app/services/rag_engine.py`)
 
@@ -106,7 +110,12 @@ flowchart TB
     subgraph Buddy["Buddy FastAPI"]
         R[routes.py]
         DE[decision_engine]
-        RD[risk_detector + risk_scorer]
+        subgraph RiskEnsemble["Risk Ensemble (3 signals)"]
+            RD[Signal 1: risk_detector\nkeyword analysis]
+            LR[Signal 2: risk_llm_scorer\nLLM clinical triage]
+            SR[Signal 3: risk_semantic_scorer\ncosine similarity]
+            RS[risk_scorer.ensemble_score\nconservative max]
+        end
         RAG[rag_engine]
         VS[vector_store / ChromaDB]
         SS[session_store]
@@ -115,7 +124,7 @@ flowchart TB
     subgraph Data
         M[(MongoDB)]
         C[(ChromaDB)]
-        G[Gemini API]
+        G[Gemini / OpenRouter API]
     end
 
     subgraph Node["Node.js Mann-Mitra"]
@@ -127,10 +136,16 @@ flowchart TB
     R -->|fallback if empty| RAG
     R --> DE
     DE --> RD
-    DE --> RAG
+    DE -->|parallel| LR
+    DE -->|parallel| RAG
+    DE --> SR
+    RD --> RS
+    LR --> RS
+    SR --> RS
     RAG --> VS
     VS --> C
     RAG --> G
+    LR --> G
     DE -->|result| R
     R -->|save_interaction| M
     R -->|alerts high/critical| N
@@ -146,7 +161,10 @@ sequenceDiagram
     participant API as routes.py
     participant M as MongoDB
     participant DE as decision_engine
-    participant Risk as risk_detector / risk_scorer
+    participant RD as risk_detector
+    participant LLMRisk as risk_llm_scorer
+    participant Sem as risk_semantic_scorer
+    participant RS as risk_scorer (ensemble)
     participant RAG as rag_engine
     participant V as ChromaDB
     participant LLM as Gemini (or fallback)
@@ -155,15 +173,26 @@ sequenceDiagram
     API->>M: get prior messages (if MONGO_URI)
     M-->>API: transcript or empty
     API->>DE: process_message(message, history)
-    DE->>Risk: analyze + score
-    Risk-->>DE: risk_level, score, explanation
-    DE->>RAG: generate_response(..., prior_messages=history)
-    RAG->>V: semantic query + topic fallback + dedupe
-    V-->>RAG: top chunks
-    RAG->>LLM: history + context + user message
-    LLM-->>RAG: reply text
+    DE->>RD: analyze (keywords, repetition, history)
+    RD-->>DE: RiskIndicators + preliminary level
+    par Parallel execution
+        DE->>RAG: generate_response(risk_hint=preliminary_level)
+        RAG->>V: semantic query + topic fallback + dedupe
+        V-->>RAG: top chunks
+        RAG->>LLM: history + context + user message
+        LLM-->>RAG: reply text
+    and
+        DE->>LLMRisk: assess(message, history)
+        LLMRisk->>LLM: clinical triage prompt (temp=0)
+        LLM-->>LLMRisk: structured JSON scores
+    end
     RAG-->>DE: reply + sources
-    DE->>DE: apply low/med/high/critical template
+    LLMRisk-->>DE: LLMRiskSignal
+    DE->>Sem: score(message) ~10ms
+    Sem-->>DE: SemanticRiskSignal
+    DE->>RS: ensemble_score(rule, llm, semantic)
+    RS-->>DE: RiskAssessment (max of all signals)
+    DE->>DE: route by risk_level
     DE-->>API: DecisionResult
     API->>M: save_interaction
     API->>API: pop_pending_alerts → Node + risk_alerts
@@ -209,6 +238,7 @@ When Uvicorn loads the app, the **lifespan** handler runs before requests are se
 
 1. **`vector_store.initialize()`** — Opens the persistent Chroma client, selects the embedding backend (Gemini vs local SentenceTransformer per `EMBEDDING_BACKEND` / `GEMINI_API_KEY`), and opens the collection `CHROMA_COLLECTION_NAME`.
 2. **`session_store.connect()`** — If `MONGO_URI` is set, connects with Motor and ensures indexes on `chat_sessions` and `risk_alerts`. If the URI is empty, Buddy runs **without** Mongo persistence (history load/save no-ops).
+3. **`risk_semantic_scorer.initialize()`** — If `RISK_SEMANTIC_ENABLED` is true, loads the SentenceTransformer model and pre-computes reference embeddings for crisis, self-harm, severe distress, and moderate distress categories. This runs once at startup so chat requests pay no model-load cost.
 
 On shutdown, the lifespan exits and **`session_store.close()`** runs.
 
@@ -217,8 +247,10 @@ flowchart LR
     S[Uvicorn / python -m app.main] --> L[lifespan: startup]
     L --> V[vector_store.initialize]
     L --> M[session_store.connect]
+    L --> RS[risk_semantic_scorer.initialize]
     V --> OK[App ready — routes live]
     M --> OK
+    RS --> OK
     OK --> H[HTTP: /chat, /ingest, /health, ...]
 ```
 
@@ -276,7 +308,7 @@ flowchart TD
 
 Detailed scoring tables and formulas are in the sections [Risk Detection Pipeline](#risk-detection-pipeline) and [Decision Engine Routing](#decision-engine-routing) below.
 
-Conceptually: **detector** extracts signals → **scorer** maps to 0–100 and a **level** → **decision_engine** chooses UI fields and whether to **queue an admin alert** for Node.
+Conceptually: **detector** extracts keyword signals → **LLM scorer** provides clinical assessment → **semantic scorer** measures similarity to crisis language → **ensemble scorer** takes the conservative max across all signals → **decision_engine** chooses UI fields and whether to **queue an admin alert** for Node. See [Risk Detection Pipeline](#risk-detection-pipeline) for full details.
 
 ---
 
@@ -300,11 +332,13 @@ Conceptually: **detector** extracts signals → **scorer** maps to 0–100 and a
 | `app/main.py` | FastAPI app, CORS, lifespan: init **vector_store**, **session_store.connect** |
 | `app/config.py` | All `.env` settings (`pydantic-settings`) |
 | `app/api/routes.py` | HTTP layer: history load, `process_message`, Mongo save, alert HTTP to Node |
-| `app/services/decision_engine.py` | Orchestrates risk → RAG → branch by level; builds `DecisionResult` |
+| `app/services/decision_engine.py` | Orchestrates parallel LLM risk + RAG, ensemble scoring, branch by level; builds `DecisionResult` |
 | `app/services/rag_engine.py` | Retrieval query construction, Chroma query, dedupe, Gemini/fallback, session message buffer |
 | `app/services/vector_store.py` | Chroma client, embeddings, `query` + topic fallback |
-| `app/services/risk_detector.py` | Keyword / language / history signals |
-| `app/services/risk_scorer.py` | Score aggregation and level |
+| `app/services/risk_detector.py` | Signal 1: keyword / language / history signals → `RiskIndicators` |
+| `app/services/risk_llm_scorer.py` | Signal 2: LLM clinical risk assessment via Gemini/OpenRouter → `LLMRiskSignal` |
+| `app/services/risk_semantic_scorer.py` | Signal 3: cosine similarity vs clinical reference phrases → `SemanticRiskSignal` |
+| `app/services/risk_scorer.py` | Multi-signal ensemble: conservative-max aggregation + overrides → `RiskAssessment` |
 | `app/services/session_store.py` | Motor async Mongo access; `get_chat_history_turns`, `save_interaction`, alerts |
 | `app/services/document_loader.py` | Chunking + metadata for ingest |
 | `app/models/schemas.py` | Pydantic API and domain models |
@@ -319,10 +353,10 @@ Conceptually: **detector** extracts signals → **scorer** maps to 0–100 and a
 | Framework | FastAPI + Uvicorn |
 | Vector DB | ChromaDB (persistent, cosine similarity) |
 | Embeddings | Google Gemini (`EMBEDDING_MODEL`, default `gemini-embedding-001`) **or** SentenceTransformers `all-MiniLM-L6-v2` via `EMBEDDING_BACKEND` (`auto` / `gemini` / `local`) |
-| LLM | Google Gemini (`GEMINI_MODEL`, default `gemini-2.0-flash`), with rule-based fallback |
+| LLM | Google Gemini (`GEMINI_MODEL`, default `gemini-2.0-flash`), OpenRouter fallback, rule-based final fallback |
 | Database | MongoDB (Motor async) — shared with Node.js server |
 | Document ingestion | PyPDF + LangChain text splitters |
-| Risk detection | Custom NLP keyword classifier with weighted scoring |
+| Risk detection | Multi-signal ensemble: rule-based keywords + LLM-as-Judge clinical triage + semantic similarity (conservative-max aggregation) |
 
 ---
 
@@ -344,9 +378,11 @@ buddy/
 │   │   ├── document_loader.py     # PDF/text ingestion + chunking + metadata
 │   │   ├── vector_store.py        # ChromaDB integration (store & query)
 │   │   ├── rag_engine.py          # RAG pipeline (retrieve → context → Gemini)
-│   │   ├── risk_detector.py       # NLP risk detection (keywords + weights)
-│   │   ├── risk_scorer.py         # Weighted risk score calculation (0-100)
-│   │   ├── decision_engine.py     # Routes response by risk level
+│   │   ├── risk_detector.py       # Signal 1: NLP keyword analysis → RiskIndicators
+│   │   ├── risk_llm_scorer.py     # Signal 2: LLM clinical risk triage → LLMRiskSignal
+│   │   ├── risk_semantic_scorer.py# Signal 3: Semantic similarity → SemanticRiskSignal
+│   │   ├── risk_scorer.py         # Ensemble: conservative-max across signals (0-100)
+│   │   ├── decision_engine.py     # Parallel risk+RAG, routes response by risk level
 │   │   └── session_store.py       # MongoDB persistence (sessions, alerts)
 │   │
 │   └── api/
@@ -514,37 +550,86 @@ Behavioral details for chat (history load, RAG, risk, Mongo, alerts) are documen
 
 ## Risk Detection Pipeline
 
-### How Risk Scoring Works
+### Architecture: Multi-Signal Ensemble
 
-Every user message is analyzed through a multi-layer risk detection system:
+Every user message is scored by **three independent signals**, combined via **conservative-max** aggregation. In mental health, a false negative (missing a suicidal user) is far more dangerous than a false positive — so if **any** signal screams HIGH, the system acts.
 
-**1. Keyword Analysis** — Weighted keyword dictionaries organized by severity:
+```mermaid
+flowchart LR
+    M[User Message] --> S1[Signal 1: Rule-based\nkeyword analysis]
+    M --> S2[Signal 2: LLM-as-Judge\nclinical triage]
+    M --> S3[Signal 3: Semantic\nsimilarity]
+    S1 --> E[Ensemble Scorer]
+    S2 --> E
+    S3 --> E
+    E --> |"max(S1, S2, S3)\n+ overrides"| R[RiskAssessment\n0-100 + level]
+```
+
+### Signal 1 — Rule-based keyword analysis (`risk_detector.py` → `risk_scorer._compute_rule_score`)
+
+Keyword dictionaries (English, Hindi, Hinglish, common misspellings) organized by severity:
 
 | Category | Example Keywords | Weight Range |
 |----------|-----------------|--------------|
-| Critical | "kill myself", "suicide", "overdose" | 75–95 |
-| High | "hopeless", "worthless", "no way out" | 45–70 |
+| Critical | "kill myself", "suicide", "overdose", "khudkushi", "marna chahta" | 75–95 |
+| High | "hopeless", "worthless", "no way out", "tang aa gaya" | 45–70 |
 | Medium | "depressed", "panic attack", "can't cope" | 25–50 |
 | Low | "stressed", "tired", "worried" | 10–15 |
 
-**2. Emotional Intensity** — Amplifiers like "extremely", "unbearable", "can't stop" multiply the base score (1.0x–1.5x).
+Plus contextual signals:
+- **Emotional Intensity** — amplifiers like "extremely", "unbearable", "bahut" (up to +6 points)
+- **Repetition Factor** — same distress keywords across multiple messages (up to +5 points)
+- **Historical Trend** — negative patterns in last 10 messages (up to +4 points)
 
-**3. Repetition Factor** — If the same distress keywords appear across multiple messages in a session, the score increases.
+Scoring is **max-based**: the single most severe indicator drives the score. A `suicidal_ideation_score` of 0.95 maps directly to ~95, not diluted to 28 by a weighted average.
 
-**4. Historical Trend** — Analysis of negative patterns across the last 10 messages in conversation history.
+### Signal 2 — LLM clinical risk assessment (`risk_llm_scorer.py`)
 
-### Risk Score Formula
+Uses the same Gemini/OpenRouter API already configured for chat. Sends the message + recent conversation history to the LLM with a clinical triage system prompt (`temperature=0` for deterministic output). Returns structured JSON:
+
+| Dimension | What it measures |
+|-----------|-----------------|
+| `suicidal_ideation` | Death wishes, planning, farewell behavior, implicit longing |
+| `self_harm_risk` | Urge or intent to physically hurt oneself |
+| `crisis_severity` | Immediate danger or acute emergency |
+| `emotional_distress` | Overall emotional pain level |
+| `hopelessness` | Feeling trapped, no future, burden to others |
+| `overall_risk` | Categorical: low / medium / high / critical |
+| `confidence` | Model's self-assessed confidence 0.0–1.0 |
+
+**Why LLM instead of sklearn:** No labeled training data exists to train a classifier. The LLM already has clinical knowledge from pre-training, understands context/sarcasm/metaphors ("I just want the pain to stop" = implicit ideation), and handles bilingual content natively.
+
+**Latency:** Runs **in parallel** with RAG via `asyncio.gather` — adds ~0 extra latency to the request.
+
+**Graceful degradation:** If the LLM call fails (rate limit, timeout), ensemble uses rule-based + semantic only. System is never worse than rule-based alone.
+
+### Signal 3 — Semantic similarity (`risk_semantic_scorer.py`)
+
+Computes cosine similarity between the user message embedding and curated clinical reference phrases for each category:
+
+| Category | # References | Example reference |
+|----------|-------------|-------------------|
+| Crisis | 10 | "I want to end my life and I have a plan to do it" |
+| Self-harm | 6 | "I've been cutting myself to cope with the pain" |
+| Severe distress | 7 | "I feel like a burden to everyone around me" |
+| Moderate distress | 6 | "I've been feeling really anxious and I can't control my worry" |
+
+Uses the same `all-MiniLM-L6-v2` SentenceTransformer already loaded for RAG. Reference embeddings are pre-computed at startup. Per-message cost: **~10 ms** (single encode + dot products).
+
+Similarity thresholds are mapped to risk scores (tuned for all-MiniLM-L6-v2 where identical-meaning ≈ 0.85, related ≈ 0.55).
+
+### Ensemble: conservative-max aggregation (`risk_scorer.ensemble_score`)
 
 ```
-Risk Score = (Emotional Intensity × 0.10)
-           + (Self-Harm Probability × 0.25)
-           + (Suicidal Ideation × 0.30)
-           + (Anxiety/Panic × 0.10)
-           + (Repetition Factor × 0.10)
-           + (Historical Trend × 0.15)
-```
+final_score = max(rule_score, llm_score, semantic_score)
 
-Scaled to 0–100, then classified:
+if 2+ signals agree on HIGH → bonus +5 (multi-signal confidence)
+
+Hard overrides (always apply):
+  - Critical keyword detected → floor at RISK_THRESHOLD_CRITICAL (81)
+  - LLM says "critical" → floor at RISK_THRESHOLD_CRITICAL (81)
+  - Suicidal ideation ≥ 0.7 → floor at RISK_THRESHOLD_HIGH (61)
+```
 
 | Score | Level | Action |
 |-------|-------|--------|
@@ -553,7 +638,25 @@ Scaled to 0–100, then classified:
 | 61–80 | **High** | Strongly recommend counselling, alert counsellor dashboard |
 | 81–100 | **Critical** | Crisis module, grounding response, emergency helplines, admin alert |
 
-**Hard Override:** If critical keywords (suicide, kill, die, overdose) are detected, the score floors at 81 (Critical).
+### Signal breakdown (transparency)
+
+Every `RiskAssessment` includes a `signal_breakdown` field for debugging and auditability:
+
+```json
+{
+  "risk_score": 85,
+  "risk_level": "critical",
+  "signal_breakdown": {
+    "rule_score": 70,
+    "llm_score": 85,
+    "semantic_score": 62,
+    "ensemble_method": "conservative_max",
+    "signals_used": ["rule", "llm", "semantic"],
+    "llm_signal": { "suicidal_ideation": 0.85, "confidence": 0.9, "concerns": ["implicit death wish"] },
+    "semantic_signal": { "crisis_similarity": 0.71, "matched_category": "crisis" }
+  }
+}
+```
 
 ---
 
@@ -688,11 +791,13 @@ If `GEMINI_API_KEY` is not set, the service operates in **fallback mode**:
 
 - **Embeddings:** Uses `all-MiniLM-L6-v2` (SentenceTransformers, runs locally)
 - **LLM responses:** Rule-based responses matched by topic (anxiety, depression, stress, loneliness, crisis)
-- **Risk detection:** Fully functional (keyword-based, no LLM dependency)
-- **Risk scoring:** Fully functional
+- **Risk detection — Signal 1 (Rule-based):** Fully functional (keyword-based, no LLM dependency)
+- **Risk detection — Signal 2 (LLM):** Disabled (graceful skip — ensemble uses remaining signals)
+- **Risk detection — Signal 3 (Semantic):** Fully functional (local SentenceTransformer, no API needed)
+- **Ensemble scoring:** Functional with 2 of 3 signals (rule + semantic)
 - **Decision engine:** Fully functional
 
-This means the chatbot works out of the box without any API keys — just with reduced response quality.
+This means the chatbot works out of the box without any API keys — just with reduced response quality and 2-signal risk assessment instead of 3.
 
 ---
 
@@ -714,6 +819,8 @@ This means the chatbot works out of the box without any API keys — just with r
 | `RISK_THRESHOLD_MEDIUM` | `31` | Score threshold for medium risk |
 | `RISK_THRESHOLD_HIGH` | `61` | Score threshold for high risk |
 | `RISK_THRESHOLD_CRITICAL` | `81` | Score threshold for critical risk |
+| `RISK_LLM_ENABLED` | `true` | Enable LLM-as-Judge risk signal (Signal 2). Set `false` to use rule+semantic only |
+| `RISK_SEMANTIC_ENABLED` | `true` | Enable semantic similarity risk signal (Signal 3). Set `false` to use rule+LLM only |
 | `MAX_HISTORY_LENGTH` | `20` | Max conversation history messages |
 | `RAG_TOP_K` | `5` | Number of vector search results |
 | `CHUNK_SIZE` | `500` | Document chunk size (tokens) |

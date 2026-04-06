@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { Link, useNavigate } from 'react-router-dom'
 import { useApi } from '../../hooks/useApi'
+import { BUDDY_AGENT_URL } from '../../utils/api'
 
 const StudentDashboard = () => {
   const { user } = useAuth()
@@ -137,8 +138,6 @@ const StudentDashboard = () => {
     if (!screening) return []
 
     const level = (screening.severity || '').toLowerCase()
-    const buddyUrl = import.meta.env.VITE_BUDDY_AGENT_URL || 'http://localhost:8000'
-
     const basePlan = level.includes('severe')
       ? [
           'Book a counsellor session in the next 24 hours.',
@@ -160,7 +159,7 @@ const StudentDashboard = () => {
     try {
       const query = `Give 3 short mental wellness action steps for ${screening.severity || 'mild'} depression screening score ${screening.score}.`
       const encodedQuery = encodeURIComponent(query)
-      const response = await fetch(`${buddyUrl}/knowledge-base/search?query=${encodedQuery}&n_results=3`)
+      const response = await fetch(`${BUDDY_AGENT_URL}/knowledge-base/search?query=${encodedQuery}&n_results=3`)
       if (!response.ok) return basePlan
 
       const data = await response.json()

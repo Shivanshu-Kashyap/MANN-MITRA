@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
-import image4 from '../assets/illustration_10.png'
+import { API_BASE_URL } from '../utils/api'
+import image4 from '../assets/Illustration_10.png'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+const API_BASE = API_BASE_URL
 
 const AdminLogin = () => {
   const { t } = useTranslation()

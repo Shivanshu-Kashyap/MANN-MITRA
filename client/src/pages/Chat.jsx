@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { io } from 'socket.io-client'
-import { useApi } from '../utils/api'
+import { useApi, BUDDY_AGENT_URL, SOCKET_URL, API_BASE_URL } from '../utils/api'
 import { useAuth } from '../contexts/AuthContext'
 import CrisisModal from '../components/CrisisModal'
 
@@ -38,7 +38,7 @@ const Chat = () => {
 
   // Initialize socket connection
   useEffect(() => {
-    const socketURL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000'
+    const socketURL = SOCKET_URL
     
     socketRef.current = io(socketURL, {
       transports: ['websocket'],
@@ -117,8 +117,7 @@ const Chat = () => {
   useEffect(() => {
     const checkBuddyHealth = async () => {
       try {
-        const buddyAgentUrl = import.meta.env.VITE_BUDDY_AGENT_URL || 'http://localhost:8000'
-        const response = await fetch(`${buddyAgentUrl}/health`, { 
+        const response = await fetch(`${BUDDY_AGENT_URL}/health`, { 
           method: 'GET',
           signal: AbortSignal.timeout(3000)
         })
@@ -143,9 +142,9 @@ const Chat = () => {
   useEffect(() => {
     console.log('🤖 Buddy Chat Component Loaded')
     console.log('📊 Environment:', {
-      buddyAgentUrl: import.meta.env.VITE_BUDDY_AGENT_URL || 'http://localhost:8000',
-      socketUrl: import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000',
-      apiUrl: import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+      buddyAgentUrl: BUDDY_AGENT_URL,
+      socketUrl: SOCKET_URL,
+      apiUrl: API_BASE_URL
     })
     
     const welcomeMessage = {
@@ -198,8 +197,7 @@ const Chat = () => {
         setIsSending(true)
         console.log('🔄 Sending to buddy voice agent...')
         
-        const buddyAgentUrl = import.meta.env.VITE_BUDDY_AGENT_URL || 'http://localhost:8000'
-        const response = await fetch(`${buddyAgentUrl}/chat`, {
+        const response = await fetch(`${BUDDY_AGENT_URL}/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -380,12 +378,11 @@ const Chat = () => {
 
     try {
       let responseReceived = false
-      const buddyAgentUrl = import.meta.env.VITE_BUDDY_AGENT_URL || 'http://localhost:8000'
 
       // Primary: Try RAG buddy agent (voice or text mode)
       if (isVoiceMode) {
         try {
-          const voiceResponse = await fetch(`${buddyAgentUrl}/chat`, {
+          const voiceResponse = await fetch(`${BUDDY_AGENT_URL}/chat`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -443,7 +440,7 @@ const Chat = () => {
         }
       } else {
         try {
-          const textResponse = await fetch(`${buddyAgentUrl}/chat/text`, {
+          const textResponse = await fetch(`${BUDDY_AGENT_URL}/chat/text`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -1096,12 +1093,12 @@ const Chat = () => {
                   buddyAgentConnected === true ? 'Online' : 
                   buddyAgentConnected === false ? 'Offline' : 'Checking...'
                 }
-                {riskLevel !== 'low' && (
+                {/* {riskLevel !== 'low' && (
                   <span className={`ml-3 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${RISK_COLORS[riskLevel]?.bg} ${RISK_COLORS[riskLevel]?.text}`}>
                     <span className={`w-1.5 h-1.5 rounded-full mr-1 ${RISK_COLORS[riskLevel]?.dot}`} />
                     Risk: {riskLevel} ({riskScore}/100)
                   </span>
-                )}
+                )} */}
               </div>
             </div>
           </div>

@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import image1 from '../assets/illustration_1.png'
-import image2 from '../assets/illustration_2.png'
+import image1 from '../assets/Illustration_1.png'
+import image2 from '../assets/Illustration_2.png'
 import image3 from '../assets/illustration_6.png'
-import image4 from '../assets/illustration_10.png'
+import image4 from '../assets/Illustration_10.png'
 import image5 from '../assets/illustration.png'
 
 const Home = () => {

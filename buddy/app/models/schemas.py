@@ -55,12 +55,48 @@ class RiskIndicators(BaseModel):
     historical_trend: float = 0.0
 
 
+class LLMRiskSignal(BaseModel):
+    """Structured risk assessment from the LLM."""
+    suicidal_ideation: float = 0.0
+    self_harm_risk: float = 0.0
+    crisis_severity: float = 0.0
+    emotional_distress: float = 0.0
+    hopelessness: float = 0.0
+    overall_risk: str = "low"
+    confidence: float = 0.0
+    concerns: list[str] = Field(default_factory=list)
+    available: bool = True
+
+
+class SemanticRiskSignal(BaseModel):
+    """Cosine-similarity scores against clinical reference phrases."""
+    crisis_similarity: float = 0.0
+    self_harm_similarity: float = 0.0
+    severe_distress_similarity: float = 0.0
+    moderate_distress_similarity: float = 0.0
+    max_similarity: float = 0.0
+    matched_category: str = "none"
+    available: bool = True
+
+
+class RiskSignalBreakdown(BaseModel):
+    """Per-signal scores for transparency and debugging."""
+    rule_score: int = 0
+    llm_score: int = 0
+    semantic_score: int = 0
+    llm_signal: Optional[LLMRiskSignal] = None
+    semantic_signal: Optional[SemanticRiskSignal] = None
+    ensemble_method: str = "conservative_max"
+    signals_used: list[str] = Field(default_factory=list)
+
+
 class RiskAssessment(BaseModel):
     risk_score: int = Field(ge=0, le=100)
     risk_level: RiskLevel
     indicators: RiskIndicators
     explanation: str = ""
     requires_immediate_action: bool = False
+    signal_breakdown: Optional[RiskSignalBreakdown] = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 

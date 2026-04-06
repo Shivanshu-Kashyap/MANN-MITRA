@@ -10,7 +10,7 @@ Mann-Mitra is a **mental health support platform** for institutions. It combines
 |------|------------|----------------|
 | **`client/`** | React 19, Vite, Tailwind | **Students** (main UX), **counsellors**, **admins**; public pages (home, about, logins) |
 | **`server/`** | Express 5, Mongoose, Socket.io | Auth, bookings, forum, screenings, admin APIs, chat HTTP API, real-time |
-| **`buddy/`** | FastAPI, ChromaDB, optional Gemini | AI chat (`/chat`, `/chat/text`), RAG, decision engine, Mongo session storage |
+| **`buddy/`** | FastAPI, ChromaDB, optional Gemini | AI chat (`/chat`, `/chat/text`), RAG, multi-signal risk ensemble, decision engine, Mongo session storage |
 
 Shared data lives in **MongoDB** (users, appointments, forum, screenings, chat sessions, etc.). **ChromaDB** is used by Buddy for vector search over the knowledge base.
 

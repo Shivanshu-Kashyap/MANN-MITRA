@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { API_BASE_URL } from '../utils/api';
+
+const BASE_URL = API_BASE_URL.endsWith('/api') ? API_BASE_URL.slice(0, -4) : API_BASE_URL;
 
 export const useApi = () => {
   const [loading, setLoading] = useState(false);
@@ -18,29 +21,16 @@ export const useApi = () => {
         ...options,
       };
 
-      // Add authorization header if token exists (admin uses 'token', others use 'Mann-Mitra_token')
       const token = localStorage.getItem('Mann-Mitra_token') || sessionStorage.getItem('Mann-Mitra_token') || localStorage.getItem('token') || sessionStorage.getItem('token');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
 
-      // Add body for POST, PUT, PATCH requests
       if (data && ['POST', 'PUT', 'PATCH'].includes(method.toUpperCase())) {
         config.body = JSON.stringify(data);
       }
 
-      // Use full URL if endpoint starts with http, otherwise use relative path
-      // Handle different ways to get the API URL
-      let baseUrl;
-      try {
-        let envUrl = import.meta?.env?.VITE_API_URL || 'http://localhost:5000';
-        // Remove /api suffix if it exists to prevent double /api in URL
-        baseUrl = envUrl.endsWith('/api') ? envUrl.slice(0, -4) : envUrl;
-      } catch (e) {
-        baseUrl = 'http://localhost:5000';
-      }
-      
-      const url = endpoint.startsWith('http') ? endpoint : `${baseUrl}${endpoint}`;
+      const url = endpoint.startsWith('http') ? endpoint : `${BASE_URL}${endpoint}`;
       
       const response = await fetch(url, config);
       

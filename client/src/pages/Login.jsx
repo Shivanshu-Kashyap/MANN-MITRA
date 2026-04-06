@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useTranslation } from 'react-i18next'
-import image1 from '../assets/illustration_1.png'
+import image1 from '../assets/Illustration_1.png'
 
 const Login = () => {
   const { t } = useTranslation()

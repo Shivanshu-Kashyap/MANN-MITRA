@@ -45,6 +45,12 @@ class Settings(BaseSettings):
     RISK_THRESHOLD_HIGH: int = 61
     RISK_THRESHOLD_CRITICAL: int = 81
 
+    # Multi-signal ensemble toggles.  Disable to fall back to rule-based only.
+    RISK_LLM_ENABLED: bool = True
+    RISK_SEMANTIC_ENABLED: bool = True
+    # Derive keyword weights from embedding-space math instead of using hardcoded values.
+    RISK_CALIBRATE_WEIGHTS: bool = True
+
     MAX_HISTORY_LENGTH: int = 20
     RAG_TOP_K: int = 5
     CHUNK_SIZE: int = 500

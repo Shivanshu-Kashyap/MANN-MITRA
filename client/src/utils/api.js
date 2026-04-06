@@ -1,7 +1,10 @@
 import axios from 'axios'
 
-// API Configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+// Centralized environment configuration
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+export const BUDDY_AGENT_URL = import.meta.env.VITE_BUDDY_AGENT_URL || 'http://localhost:8000'
+export const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000'
+
 const TOKEN_KEY = 'Mann-Mitra_token'
 
 // Create axios instance

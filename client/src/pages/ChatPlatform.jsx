@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { io } from 'socket.io-client'
 import { useApi } from '../hooks/useApi'
+import { SOCKET_URL } from '../utils/api'
 
 const ChatPlatform = () => {
   const { t } = useTranslation()
@@ -136,7 +137,7 @@ const ChatPlatform = () => {
       return
     }
     
-    const socketURL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000'
+    const socketURL = SOCKET_URL
     console.log('Connecting to socket server:', socketURL)
     
     socketRef.current = io(socketURL, {

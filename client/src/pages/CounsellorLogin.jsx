@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
 import { useApi } from '../hooks/useApi'
-import image2 from '../assets/illustration_2.png'
+import image2 from '../assets/Illustration_2.png'
 
 const CounsellorLogin = () => {
   const { t } = useTranslation()
