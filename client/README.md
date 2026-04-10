@@ -195,30 +195,30 @@ React 19, React Router 7, Tailwind CSS 4, Framer Motion, i18next, TanStack Query
 ```mermaid
 flowchart TD
   subgraph Public["Public (no student guard)"]
-    H[Home / About]
-    SL[Student /login + /register]
-    AL[/admin/login + /admin/signup]
-    CL[/counsellor/login]
+    H["Home / About"]
+    SL["Student /login + /register"]
+    AL["/admin/login + /admin/signup"]
+    CL["/counsellor/login"]
   end
 
   subgraph Student["Student-only routes"]
-    SD[/dashboard]
-    SC[/screening]
-    BK[/booking]
-    AP[/appointments]
-    FR[/forum]
-    RS[/resources]
-    CH[/chat → Buddy]
-    CE[/certification/*]
+    SD["/dashboard"]
+    SC["/screening"]
+    BK["/booking"]
+    AP["/appointments"]
+    FR["/forum"]
+    RS["/resources"]
+    CH["/chat → Buddy"]
+    CE["/certification/*"]
   end
 
   subgraph Counsellor["Counsellor"]
-    CD[/counsellor/dashboard]
-    CP[/chat-platform]
+    CD["/counsellor/dashboard"]
+    CP["/chat-platform"]
   end
 
   subgraph Admin["Admin"]
-    AD[/admin/dashboard]
+    AD["/admin/dashboard"]
   end
 
   SL --> SD
