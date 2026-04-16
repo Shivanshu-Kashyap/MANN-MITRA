@@ -1,264 +1,484 @@
-import { useState, useEffect, useCallback } from 'react'
-import { useTranslation } from 'react-i18next'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import logoImage from '../assets/Mann-mitra.png'
 import { useApi } from '../hooks/useApi'
 import { clearStoredAuth } from '../utils/routeAuth'
 
+const tabs = [
+  ['dashboard', 'Command Center'],
+  ['appointments', 'Appointments'],
+  ['certification', 'Certification'],
+  ['availability', 'Availability'],
+  ['reports', 'Reports'],
+  ['profile', 'Profile'],
+]
+
+const STORAGE_KEY = 'counsellorAvailabilitySchedule'
+const dayOrder = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+const defaultSchedule = {
+  monday: [{ start: '09:00', end: '17:00' }],
+  tuesday: [{ start: '09:00', end: '17:00' }],
+  wednesday: [{ start: '09:00', end: '17:00' }],
+  thursday: [{ start: '09:00', end: '17:00' }],
+  friday: [{ start: '09:00', end: '17:00' }],
+  saturday: [],
+  sunday: [],
+}
+const certificationSeed = [
+  {
+    id: 1,
+    studentId: 'user123',
+    studentName: 'Anonymous Student #1234',
+    counsellorName: 'Dr. Sarah Johnson',
+    date: '2025-09-30',
+    time: '10:00',
+    examScore: 87,
+    status: 'scheduled',
+    notes: 'Interested in peer support for anxiety and depression topics',
+  },
+  {
+    id: 2,
+    studentId: 'user456',
+    studentName: 'Anonymous Student #5678',
+    counsellorName: 'Dr. Sarah Johnson',
+    date: '2025-09-28',
+    time: '14:30',
+    examScore: 92,
+    status: 'completed',
+    evaluation: {
+      approved: true,
+      notes: 'Excellent understanding of peer support principles.',
+      recommendations: 'Recommended for certification approval.',
+    },
+  },
+]
+
+const cx = (...values) => values.filter(Boolean).join(' ')
+const card =
+  'rounded-[28px] border border-white/10 bg-[#0d1820]/88 shadow-[0_24px_70px_rgba(0,0,0,0.28)] backdrop-blur-xl'
+const panel =
+  'rounded-[28px] border border-white/10 bg-[#0d1820]/88 shadow-[0_24px_70px_rgba(0,0,0,0.28)] backdrop-blur-xl overflow-hidden'
+const input =
+  'w-full rounded-2xl border border-white/10 bg-[#09141b] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/35'
+const ghostBtn =
+  'inline-flex items-center justify-center rounded-2xl border border-white/12 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-slate-100 transition hover:border-cyan-300/25 hover:bg-white/[0.08]'
+const primaryBtn =
+  'inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-cyan-400 via-teal-400 to-emerald-400 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-[0_18px_40px_rgba(45,212,191,0.28)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60'
+
+const formatDate = (value, options = { year: 'numeric', month: 'short', day: 'numeric' }) =>
+  value ? new Date(value).toLocaleDateString('en-US', options) : '—'
+const formatDateTime = value =>
+  value
+    ? new Date(value).toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : '—'
+const formatTime = value =>
+  value
+    ? new Date(value).toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      })
+    : '—'
+const formatLongDate = value =>
+  value
+    ? new Date(value).toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : '—'
+const modeLabel = mode =>
+  ({
+    video: 'Video Call',
+    tele: 'Online Session',
+    chat: 'Online Session',
+    'in-person': 'In-Person',
+  })[mode?.toLowerCase()] || 'Session'
+const badge = tone =>
+  ({
+    confirmed: 'bg-emerald-500/12 text-emerald-200 ring-1 ring-emerald-400/20',
+    pending: 'bg-amber-500/12 text-amber-100 ring-1 ring-amber-400/20',
+    requested: 'bg-amber-500/12 text-amber-100 ring-1 ring-amber-400/20',
+    completed: 'bg-sky-500/12 text-sky-100 ring-1 ring-sky-400/20',
+    cancelled: 'bg-rose-500/12 text-rose-100 ring-1 ring-rose-400/20',
+    high: 'bg-rose-500/12 text-rose-100 ring-1 ring-rose-400/20',
+    medium: 'bg-amber-500/12 text-amber-100 ring-1 ring-amber-400/20',
+    low: 'bg-emerald-500/12 text-emerald-100 ring-1 ring-emerald-400/20',
+    critical: 'bg-rose-500/12 text-rose-100 ring-1 ring-rose-400/20',
+  })[tone?.toLowerCase()] || 'bg-white/8 text-slate-200 ring-1 ring-white/10'
+
+const LoadingScreen = ({ label }) => (
+  <div className='flex min-h-screen items-center justify-center bg-[#071115] px-6'>
+    <div className='rounded-[28px] border border-white/10 bg-white/5 px-10 py-8 text-center shadow-2xl backdrop-blur-xl'>
+      <div className='mx-auto h-12 w-12 animate-spin rounded-full border-2 border-cyan-300/30 border-t-cyan-200' />
+      <p className='mt-4 text-sm font-medium uppercase tracking-[0.24em] text-slate-300'>{label}</p>
+    </div>
+  </div>
+)
+
+const Panel = ({ title, subtitle, action, children }) => (
+  <section className={panel}>
+    <div className='border-b border-white/8 px-6 py-5 sm:px-7'>
+      <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+        <div>
+          <h3 className='text-lg font-semibold text-white'>{title}</h3>
+          {subtitle && <p className='mt-1 text-sm text-slate-400'>{subtitle}</p>}
+        </div>
+        {action}
+      </div>
+    </div>
+    <div className='px-6 py-6 sm:px-7'>{children}</div>
+  </section>
+)
+
+const EmptyState = ({ title, body }) => (
+  <div className='rounded-[24px] border border-dashed border-white/12 bg-white/[0.03] px-6 py-12 text-center'>
+    <div className='mx-auto h-14 w-14 rounded-2xl border border-white/10 bg-white/[0.06]' />
+    <h4 className='mt-4 text-lg font-semibold text-white'>{title}</h4>
+    <p className='mt-2 text-sm text-slate-400'>{body}</p>
+  </div>
+)
+
+const StatCard = ({ label, value, hint, accent }) => (
+  <div className='relative overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.04] p-5'>
+    <div className={cx('absolute inset-x-0 top-0 h-1.5', accent)} />
+    <p className='text-xs font-medium uppercase tracking-[0.22em] text-slate-400'>{label}</p>
+    <p className='mt-4 text-4xl font-semibold text-white'>{value}</p>
+    <p className='mt-3 text-sm text-slate-400'>{hint}</p>
+  </div>
+)
+
+const Tag = ({ children, className = '' }) => (
+  <span
+    className={cx('inline-flex items-center rounded-full px-3 py-1 text-xs font-medium', className)}
+  >
+    {children}
+  </span>
+)
+const TextField = props => <input {...props} className={cx(input, props.className)} />
+const AreaField = props => <textarea {...props} className={cx(input, props.className)} />
+const SelectField = ({ children, className = '', ...props }) => (
+  <select {...props} className={cx(input, className)}>
+    {children}
+  </select>
+)
+const GhostButton = ({ children, className = '', ...props }) => (
+  <button {...props} className={cx(ghostBtn, className)}>
+    {children}
+  </button>
+)
+const PrimaryButton = ({ children, className = '', ...props }) => (
+  <button {...props} className={cx(primaryBtn, className)}>
+    {children}
+  </button>
+)
+const Modal = ({ children }) => (
+  <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-6 backdrop-blur-md'>
+    <div className='max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-[30px] border border-white/12 bg-[#0b151c] shadow-[0_36px_100px_rgba(0,0,0,0.52)]'>
+      {children}
+    </div>
+  </div>
+)
+
 const CounsellorDashboard = () => {
-  const { t } = useTranslation()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('dashboard')
-  const [appointments, setAppointments] = useState([])
-  const [availability, setAvailability] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [user, setUser] = useState(null)
 
   useEffect(() => {
     const userData = localStorage.getItem('user')
     const token = localStorage.getItem('Mann-Mitra_token')
-    if (userData) {
-      const parsedUser = JSON.parse(userData)
-      setUser(parsedUser)
-      if (parsedUser.role !== 'counsellor') {
-        console.warn('User is not a counsellor:', parsedUser.role)
-      }
-    }
-    if (!token) console.error('No authentication token found!')
-    fetchDashboardData()
-  }, [])
-
-  const fetchDashboardData = async () => {
+    if (!token || !userData) return navigate('/counsellor/login')
     try {
-      const token = localStorage.getItem('Mann-Mitra_token')
-      const userData = localStorage.getItem('user')
-      if (!token || !userData) { navigate('/counsellor/login'); return }
-      const u = JSON.parse(userData)
-      if (u.role !== 'counsellor') { navigate('/counsellor/login'); return }
+      const parsedUser = JSON.parse(userData)
+      if (parsedUser.role !== 'counsellor') return navigate('/counsellor/login')
+      setUser(parsedUser)
       setIsLoading(false)
     } catch (error) {
-      console.error('Error fetching dashboard data:', error)
-      setIsLoading(false)
+      console.error('Error parsing counsellor session:', error)
+      navigate('/counsellor/login')
     }
-  }
+  }, [navigate])
 
-  const tabs = [
-    { id: 'dashboard', name: 'Dashboard' },
-    { id: 'appointments', name: 'Appointments' },
-    { id: 'certification', name: 'Certification' },
-    { id: 'availability', name: 'Availability' },
-    { id: 'reports', name: 'Reports' },
-    { id: 'profile', name: 'Profile' }
-  ]
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F9F7F4' }}>
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-teal-800"></div>
-      </div>
-    )
-  }
+  if (isLoading) return <LoadingScreen label='Preparing counsellor workspace' />
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#F9F7F4' }}>
-      {/* Header */}
-      <div className="bg-[#1A3438] text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-5">
-            <div className="flex items-center space-x-4">
-              <button onClick={() => navigate('/')} className="cursor-pointer hover:opacity-80 transition-opacity">
-                <img src={logoImage} alt="Mann-Mitra Logo" className="h-14 w-auto" />
+    <div className='min-h-screen overflow-hidden bg-[#071115] text-white'>
+      <div className='pointer-events-none absolute inset-0'>
+        <div className='absolute left-[-8rem] top-[-6rem] h-80 w-80 rounded-full bg-cyan-500/12 blur-3xl' />
+        <div className='absolute right-[-7rem] top-24 h-72 w-72 rounded-full bg-emerald-500/12 blur-3xl' />
+        <div className='absolute bottom-[-8rem] left-1/3 h-80 w-80 rounded-full bg-sky-500/8 blur-3xl' />
+      </div>
+
+      <div className='relative mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8'>
+        <header className='overflow-hidden rounded-[34px] border border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.22),_transparent_38%),linear-gradient(135deg,rgba(9,20,27,0.96),rgba(14,28,36,0.88))] shadow-[0_30px_100px_rgba(0,0,0,0.45)]'>
+          <div className='flex flex-col gap-8 px-6 py-6 sm:px-8 lg:flex-row lg:items-center lg:justify-between'>
+            <div className='flex flex-col gap-5 sm:flex-row sm:items-center'>
+              <button
+                onClick={() => navigate('/')}
+                className='w-fit rounded-[22px] border border-white/10 bg-white/[0.06] p-3 transition hover:bg-white/[0.1]'
+              >
+                <img src={logoImage} alt='Mann-Mitra Logo' className='h-14 w-auto' />
               </button>
               <div>
-                <h1 className="text-xl font-bold">Counsellor Dashboard</h1>
-                <p className="text-teal-200 text-sm">Welcome back, {user?.name || 'Counsellor'}</p>
+                <p className='text-xs font-medium uppercase tracking-[0.3em] text-cyan-200/80'>
+                  Counsellor dashboard
+                </p>
+                <h1 className='mt-2 text-3xl font-semibold tracking-tight text-white sm:text-4xl'>
+                  A sharper dark-mode workspace for every session.
+                </h1>
+                <p className='mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base'>
+                  Review your day, respond to requests, complete reports, and manage availability
+                  from one calm, high-contrast control surface.
+                </p>
+                <div className='mt-5 flex flex-wrap gap-3'>
+                  <Tag className='bg-white/8 text-cyan-100 ring-1 ring-white/10'>
+                    {user?.specialization || 'General Counselling'}
+                  </Tag>
+                  <Tag className='bg-emerald-500/12 text-emerald-100 ring-1 ring-emerald-400/20'>
+                    Private session notes protected
+                  </Tag>
+                  <Tag className='bg-sky-500/12 text-sky-100 ring-1 ring-sky-400/20'>
+                    Optimized for low-light focus
+                  </Tag>
+                </div>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
-              {user?.specialization && (
-                <span className="bg-white/10 text-teal-100 px-3 py-1 rounded-full text-sm">
-                  {user.specialization}
-                </span>
-              )}
-              <button
-                onClick={() => { clearStoredAuth(); navigate('/counsellor/login') }}
-                className="text-sm font-medium text-teal-200 hover:text-white px-4 py-2 rounded-xl border border-white/20 hover:bg-white/10 transition-colors"
-              >
-                Logout
-              </button>
+            <div className='grid gap-4 sm:grid-cols-2 lg:w-[340px]'>
+              <div className='rounded-[24px] border border-white/10 bg-white/[0.05] p-5'>
+                <p className='text-xs uppercase tracking-[0.22em] text-slate-400'>Signed in as</p>
+                <p className='mt-3 text-xl font-semibold text-white'>
+                  {user?.name || 'Counsellor'}
+                </p>
+                <p className='mt-1 text-sm text-slate-400'>
+                  {user?.email || 'Verified professional account'}
+                </p>
+              </div>
+              <div className='flex flex-col justify-between rounded-[24px] border border-white/10 bg-white/[0.05] p-5'>
+                <div>
+                  <p className='text-xs uppercase tracking-[0.22em] text-slate-400'>
+                    Workspace status
+                  </p>
+                  <p className='mt-3 text-xl font-semibold text-white'>Active</p>
+                  <p className='mt-1 text-sm text-slate-400'>
+                    Ready for live sessions and evaluations
+                  </p>
+                </div>
+                <GhostButton
+                  className='mt-4'
+                  onClick={() => {
+                    clearStoredAuth()
+                    navigate('/counsellor/login')
+                  }}
+                >
+                  Logout
+                </GhostButton>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+        </header>
 
-      {/* Tab Navigation */}
-      <div className="bg-[#1A3438]/90 border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex space-x-1">
-            {tabs.map((tab) => (
+        <nav className='mt-6 rounded-[26px] border border-white/10 bg-white/[0.04] p-2 shadow-[0_20px_50px_rgba(0,0,0,0.2)] backdrop-blur-xl'>
+          <div className='flex flex-wrap gap-2'>
+            {tabs.map(([id, name]) => (
               <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`py-3 px-5 font-medium text-sm rounded-t-xl transition-colors ${
-                  activeTab === tab.id
-                    ? 'bg-[#F9F7F4] text-teal-800'
-                    : 'text-teal-200 hover:text-white hover:bg-white/10'
-                }`}
+                key={id}
+                onClick={() => setActiveTab(id)}
+                className={cx(
+                  'rounded-[20px] px-4 py-3 text-sm font-medium transition sm:px-5',
+                  activeTab === id
+                    ? 'bg-gradient-to-r from-cyan-400 via-teal-400 to-emerald-400 text-slate-950 shadow-[0_18px_35px_rgba(45,212,191,0.28)]'
+                    : 'text-slate-300 hover:bg-white/[0.06] hover:text-white'
+                )}
               >
-                {tab.name}
+                {name}
               </button>
             ))}
-          </nav>
-        </div>
-      </div>
+          </div>
+        </nav>
 
-      {/* Tab Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'dashboard' && <DashboardTab />}
-        {activeTab === 'appointments' && <AppointmentsTab />}
-        {activeTab === 'certification' && <CertificationTab />}
-        {activeTab === 'availability' && <AvailabilityTab />}
-        {activeTab === 'reports' && <ReportsTab />}
-        {activeTab === 'profile' && <ProfileTab user={user} />}
+        <main className='mt-6 space-y-6'>
+          {activeTab === 'dashboard' && <DashboardTab user={user} />}
+          {activeTab === 'appointments' && <AppointmentsTab />}
+          {activeTab === 'certification' && <CertificationTab />}
+          {activeTab === 'availability' && <AvailabilityTab />}
+          {activeTab === 'reports' && <ReportsTab />}
+          {activeTab === 'profile' && <ProfileTab user={user} />}
+        </main>
       </div>
     </div>
   )
 }
 
-// Dashboard Overview Tab
-const DashboardTab = () => {
+const DashboardTab = ({ user }) => {
   const { callApi } = useApi()
-  const [dashboardData, setDashboardData] = useState({
-    appointments: [], stats: { today: 0, thisWeek: 0, pending: 0, completed: 0 }, loading: true
+  const [data, setData] = useState({
+    appointments: [],
+    stats: { today: 0, week: 0, pending: 0, completed: 0, urgent: 0 },
+    loading: true,
   })
 
-  useEffect(() => { fetchDashboardData() }, [])
+  useEffect(() => {
+    fetchData()
+  }, [])
 
-  const fetchDashboardData = async () => {
+  const fetchData = async () => {
     try {
       const response = await callApi('/api/v1/appointments/me', 'GET')
-      if (response.success) {
-        const serverResponse = response.data || response
-        const appointments = serverResponse.appointments || []
-        const today = new Date()
-        const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-        const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1)
-        const startOfWeek = new Date(today); startOfWeek.setDate(today.getDate() - today.getDay())
-        const todayAppointments = appointments.filter(apt => { const d = new Date(apt.slotStart); return d >= startOfDay && d < endOfDay })
-        const weeklyAppointments = appointments.filter(apt => new Date(apt.slotStart) >= startOfWeek)
-        const pendingAppointments = appointments.filter(apt => apt.status === 'requested' || apt.status === 'pending')
-        const completedAppointments = appointments.filter(apt => apt.status === 'completed')
-        setDashboardData({
-          appointments: todayAppointments,
-          stats: { today: todayAppointments.length, thisWeek: weeklyAppointments.length, pending: pendingAppointments.length, completed: completedAppointments.length },
-          loading: false
-        })
-      }
+      const list = response.success ? (response.data || response).appointments || [] : []
+      const now = new Date()
+      const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      const dayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+      const weekStart = new Date(now)
+      weekStart.setDate(now.getDate() - now.getDay())
+      const today = list.filter(a => {
+        const slot = new Date(a.slotStart)
+        return slot >= dayStart && slot < dayEnd
+      })
+      setData({
+        appointments: today.sort((a, b) => new Date(a.slotStart) - new Date(b.slotStart)),
+        stats: {
+          today: today.length,
+          week: list.filter(a => new Date(a.slotStart) >= weekStart).length,
+          pending: list.filter(a => ['pending', 'requested'].includes(a.status?.toLowerCase()))
+            .length,
+          completed: list.filter(a => a.status === 'completed').length,
+          urgent: list.filter(a => a.urgency === 'high').length,
+        },
+        loading: false,
+      })
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
-      setDashboardData(prev => ({ ...prev, loading: false }))
+      setData(current => ({ ...current, loading: false }))
     }
   }
 
-  const formatTime = (dateString) => new Date(dateString).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
-  const getModeLabel = (mode) => { switch (mode?.toLowerCase()) { case 'video': return 'Video Call'; case 'tele': case 'chat': return 'Online Session'; case 'in-person': return 'In-Person'; default: return 'Session' } }
+  if (data.loading) return <LoadingScreen label='Loading dashboard insights' />
 
-  const stats = [
-    { label: "Today's Appointments", value: dashboardData.stats.today, sub: dashboardData.stats.today > 0 ? 'Schedule active' : 'No appointments today', accent: 'bg-teal-500' },
-    { label: "This Week's Sessions", value: dashboardData.stats.thisWeek, sub: `${dashboardData.stats.completed} completed`, accent: 'bg-amber-500' },
-    { label: 'Pending Requests', value: dashboardData.stats.pending, sub: 'Need your response', accent: 'bg-sky-500' },
-    { label: 'Completed Sessions', value: dashboardData.stats.completed, sub: 'This month', accent: 'bg-violet-500' }
+  const insights = [
+    data.stats.today
+      ? `${data.stats.today} session${data.stats.today > 1 ? 's' : ''} on your schedule today.`
+      : 'Your calendar is clear today.',
+    data.stats.pending
+      ? `${data.stats.pending} request${data.stats.pending > 1 ? 's' : ''} still need your response.`
+      : 'No appointment requests are waiting on you.',
+    data.stats.urgent
+      ? `${data.stats.urgent} high-priority case${data.stats.urgent > 1 ? 's are' : ' is'} flagged.`
+      : 'No high-priority urgency flags right now.',
   ]
 
-  if (dashboardData.loading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-800"></div>
-        <span className="ml-2 text-gray-500">Loading dashboard...</span>
-      </div>
-    )
-  }
-
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, i) => (
-          <div key={i} className="bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-            <div className={`h-1.5 w-full ${stat.accent}`}></div>
-            <div className="p-6">
-              <p className="text-sm text-gray-500 mb-1">{stat.label}</p>
-              <p className="text-3xl font-bold text-[#2A3F47]">{stat.value}</p>
-              <p className="text-xs text-gray-400 mt-1">{stat.sub}</p>
-            </div>
-          </div>
-        ))}
+    <div className='space-y-6'>
+      <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
+        <StatCard
+          label="Today's sessions"
+          value={data.stats.today}
+          hint='Live calendar load for the day'
+          accent='bg-cyan-400'
+        />
+        <StatCard
+          label='This week'
+          value={data.stats.week}
+          hint='Upcoming and completed sessions this week'
+          accent='bg-emerald-400'
+        />
+        <StatCard
+          label='Pending requests'
+          value={data.stats.pending}
+          hint='Requests that still need a decision'
+          accent='bg-amber-400'
+        />
+        <StatCard
+          label='Completed'
+          value={data.stats.completed}
+          hint='Closed sessions with saved outcomes'
+          accent='bg-sky-400'
+        />
       </div>
-
-      {/* Today's Schedule */}
-      <div className="bg-white rounded-2xl shadow-md overflow-hidden">
-        <div className="h-1.5 w-full bg-teal-500"></div>
-        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-[#2A3F47]">Today's Schedule ({dashboardData.appointments.length} appointments)</h3>
-          <button onClick={fetchDashboardData} className="text-sm text-teal-800 hover:text-teal-900 font-medium">Refresh</button>
-        </div>
-        <div className="p-6">
-          {dashboardData.appointments.length === 0 ? (
-            <div className="text-center py-8">
-              <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-7 h-7 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-              </div>
-              <h4 className="text-lg font-medium text-[#2A3F47] mb-2">No appointments today</h4>
-              <p className="text-gray-400">You have a free day! Check back tomorrow.</p>
-            </div>
+      <div className='grid gap-6 xl:grid-cols-[1.65fr_1fr]'>
+        <Panel
+          title="Today's schedule"
+          subtitle={`${data.appointments.length} appointment${data.appointments.length === 1 ? '' : 's'} lined up for ${user?.name || 'you'}.`}
+          action={<GhostButton onClick={fetchData}>Refresh</GhostButton>}
+        >
+          {data.appointments.length === 0 ? (
+            <EmptyState
+              title='No appointments today'
+              body='You have space to catch up on reports, update availability, or prepare for upcoming sessions.'
+            />
           ) : (
-            <div className="space-y-3">
-              {dashboardData.appointments.sort((a, b) => new Date(a.slotStart) - new Date(b.slotStart)).map((appointment) => (
-                <div key={appointment._id} className="flex items-center justify-between p-4 border border-gray-100 rounded-xl hover:bg-gray-50/50 transition-colors">
-                  <div className="flex items-center space-x-4">
-                    <div className="text-sm font-medium text-[#2A3F47]">{formatTime(appointment.slotStart)} – {formatTime(appointment.slotEnd)}</div>
-                    <div>
-                      <p className="text-sm font-medium text-[#2A3F47]">{appointment.studentId?.name || 'Anonymous Student'}</p>
-                      <p className="text-xs text-gray-400">
-                        {getModeLabel(appointment.mode)}
-                        {appointment.urgency && (
-                          <span className={`ml-2 px-1.5 py-0.5 rounded text-xs ${appointment.urgency === 'high' ? 'bg-rose-50 text-rose-700' : appointment.urgency === 'medium' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>{appointment.urgency}</span>
+            <div className='space-y-3'>
+              {data.appointments.map(appointment => (
+                <div
+                  key={appointment._id}
+                  className='rounded-[24px] border border-white/10 bg-white/[0.04] p-4 transition hover:bg-white/[0.06]'
+                >
+                  <div className='flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between'>
+                    <div className='flex flex-col gap-3 sm:flex-row sm:items-start'>
+                      <div className='min-w-[132px] rounded-2xl border border-cyan-300/15 bg-cyan-400/10 px-4 py-3 text-center'>
+                        <p className='text-xs uppercase tracking-[0.2em] text-cyan-100/80'>
+                          Session window
+                        </p>
+                        <p className='mt-2 text-sm font-semibold text-white'>
+                          {formatTime(appointment.slotStart)} - {formatTime(appointment.slotEnd)}
+                        </p>
+                      </div>
+                      <div>
+                        <h4 className='text-base font-semibold text-white'>
+                          {appointment.studentId?.name || 'Anonymous Student'}
+                        </h4>
+                        <p className='mt-1 text-sm text-slate-400'>{modeLabel(appointment.mode)}</p>
+                        {appointment.reason && (
+                          <p className='mt-2 max-w-xl text-sm text-slate-300'>
+                            {appointment.reason}
+                          </p>
                         )}
-                      </p>
-                      {appointment.reason && <p className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">Reason: {appointment.reason}</p>}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full ${
-                      appointment.status === 'completed' ? 'bg-emerald-50 text-emerald-700' :
-                      appointment.status === 'confirmed' ? 'bg-sky-50 text-sky-700' :
-                      appointment.status === 'requested' ? 'bg-amber-50 text-amber-700' :
-                      'bg-gray-100 text-gray-700'
-                    }`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${
-                        appointment.status === 'completed' ? 'bg-emerald-500' :
-                        appointment.status === 'confirmed' ? 'bg-sky-500' :
-                        appointment.status === 'requested' ? 'bg-amber-500' :
-                        'bg-gray-400'
-                      }`}></span>
-                      {appointment.status === 'completed' && 'Completed'}
-                      {appointment.status === 'confirmed' && 'Confirmed'}
-                      {appointment.status === 'requested' && 'Pending'}
-                      {!['completed', 'confirmed', 'requested'].includes(appointment.status) && appointment.status}
-                    </span>
-                    {appointment.status === 'confirmed' && <span className="text-xs text-teal-800 font-medium">Ready to join</span>}
-                    {appointment.status === 'requested' && <span className="text-xs text-amber-600 font-medium">Awaiting response</span>}
+                    <div className='flex flex-wrap items-center gap-2'>
+                      <Tag className={badge(appointment.status)}>
+                        {appointment.status || 'pending'}
+                      </Tag>
+                      {appointment.urgency && (
+                        <Tag className={badge(appointment.urgency)}>
+                          {appointment.urgency} priority
+                        </Tag>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           )}
-        </div>
+        </Panel>
+        <Panel
+          title='Care priorities'
+          subtitle='A quick read on your workflow so you can act fast.'
+        >
+          <div className='space-y-3'>
+            {insights.map((text, index) => (
+              <div
+                key={index}
+                className='rounded-[22px] border border-white/10 bg-white/[0.04] p-4 text-sm leading-6 text-slate-300'
+              >
+                {text}
+              </div>
+            ))}
+          </div>
+        </Panel>
       </div>
     </div>
   )
 }
 
-// Appointments Management Tab
 const AppointmentsTab = () => {
   const navigate = useNavigate()
   const { callApi } = useApi()
@@ -266,329 +486,430 @@ const AppointmentsTab = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [filter, setFilter] = useState('all')
-  const [completeSessionAppointment, setCompleteSessionAppointment] = useState(null)
+  const [completeAppointment, setCompleteAppointment] = useState(null)
   const [completeForm, setCompleteForm] = useState({ sessionRiskLevel: 'low', sessionSummary: '' })
 
-  useEffect(() => { fetchAppointments() }, [])
-
+  useEffect(() => {
+    fetchAppointments()
+  }, [])
   const fetchAppointments = async () => {
     try {
-      setLoading(true); setError(null)
+      setLoading(true)
+      setError(null)
       const response = await callApi('/api/v1/appointments/me', 'GET')
-      if (response.success) {
-        const serverResponse = response.data || response
-        setAppointments(serverResponse.appointments || [])
-      } else { setError('Failed to load appointments') }
+      setAppointments(response.success ? (response.data || response).appointments || [] : [])
+      if (!response.success) setError('Failed to load appointments')
     } catch (err) {
       console.error('Error fetching counsellor appointments:', err)
       setError('Failed to load appointments')
-    } finally { setLoading(false) }
-  }
-
-  const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'confirmed': return 'bg-emerald-50 text-emerald-700'
-      case 'pending': case 'requested': return 'bg-amber-50 text-amber-700'
-      case 'completed': return 'bg-sky-50 text-sky-700'
-      case 'cancelled': return 'bg-rose-50 text-rose-700'
-      default: return 'bg-gray-100 text-gray-700'
+    } finally {
+      setLoading(false)
     }
   }
-
-  const getModeLabel = (mode) => { switch (mode?.toLowerCase()) { case 'video': return 'Video Call'; case 'tele': case 'chat': return 'Online Session'; case 'in-person': return 'In-Person'; default: return 'Session' } }
-  const formatDate = (ds) => new Date(ds).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-  const formatTime = (ds) => new Date(ds).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
-
-  const handleConfirmAppointment = async (appointmentId) => {
+  const patchStatus = async (id, payload, successMessage) => {
     try {
-      const response = await callApi(`/api/v1/appointments/${appointmentId}/status`, 'PATCH', { status: 'confirmed' })
-      if (response.success) { fetchAppointments(); alert('Appointment confirmed successfully!') }
-    } catch (error) { console.error('Error confirming appointment:', error); alert('Failed to confirm appointment') }
-  }
-
-  const handleCancelAppointment = async (appointmentId) => {
-    if (confirm('Are you sure you want to cancel this appointment?')) {
-      try {
-        const response = await callApi(`/api/v1/appointments/${appointmentId}/status`, 'PATCH', { status: 'cancelled', cancellationReason: 'Cancelled by counsellor' })
-        if (response.success) { fetchAppointments(); alert('Appointment cancelled successfully!') }
-      } catch (error) { console.error('Error cancelling appointment:', error); alert('Failed to cancel appointment') }
+      const response = await callApi(`/api/v1/appointments/${id}/status`, 'PATCH', payload)
+      if (response.success) {
+        fetchAppointments()
+        if (successMessage) alert(successMessage)
+      } else alert(response.error || 'Update failed')
+    } catch (error) {
+      console.error('Error updating appointment:', error)
+      alert('Failed to update appointment')
     }
   }
-
-  const handleJoinSession = (appointment) => {
+  const handleJoin = appointment => {
     try {
-      if (appointment.mode === 'video' || appointment.mode === 'tele' || appointment.mode === 'chat') {
-        const studentId = appointment.studentId?._id || appointment.studentId
-        navigate(`/chat-platform?appointment=${appointment._id}&user=${studentId}`)
-      } else { alert('Please prepare for the in-person session at the scheduled time and location.') }
-    } catch (error) { console.error('Error in joinSession:', error); alert('Unable to join session. Please try again.') }
+      if (['video', 'tele', 'chat'].includes(appointment.mode))
+        navigate(
+          `/chat-platform?appointment=${appointment._id}&user=${appointment.studentId?._id || appointment.studentId}`
+        )
+      else alert('Please prepare for the in-person session at the scheduled time and location.')
+    } catch (error) {
+      console.error('Error joining session:', error)
+      alert('Unable to join session. Please try again.')
+    }
   }
-
-  const handleOpenCompleteForm = (appointment) => {
-    setCompleteSessionAppointment(appointment)
-    setCompleteForm({ sessionRiskLevel: 'low', sessionSummary: '' })
-  }
-
-  const handleSubmitCompleteSession = async () => {
-    if (!completeSessionAppointment) return
-    const id = completeSessionAppointment._id || completeSessionAppointment.id
-    try {
-      const response = await callApi(`/api/v1/appointments/${id}/status`, 'PATCH', {
-        status: 'completed', sessionRiskLevel: completeForm.sessionRiskLevel, sessionSummary: completeForm.sessionSummary.trim() || undefined
-      })
-      if (response.success) { setCompleteSessionAppointment(null); fetchAppointments(); alert('Session marked complete and report saved.') }
-      else { alert(response.error || 'Failed to complete session') }
-    } catch (err) { alert(err.message || 'Failed to complete session') }
-  }
-
-  const filteredAppointments = appointments.filter(appointment => {
-    if (filter === 'all') return true
-    const status = appointment.status?.toLowerCase()
-    if (filter === 'pending') return status === 'pending' || status === 'requested'
-    return status === filter.toLowerCase()
-  })
-
-  const filterTabs = [
-    { key: 'all', label: 'All' },
-    { key: 'pending', label: 'Pending' },
-    { key: 'confirmed', label: 'Confirmed' },
-    { key: 'completed', label: 'Completed' },
-    { key: 'cancelled', label: 'Cancelled' }
+  const filtered = appointments.filter(appointment =>
+    filter === 'all'
+      ? true
+      : filter === 'pending'
+        ? ['pending', 'requested'].includes(appointment.status?.toLowerCase())
+        : appointment.status?.toLowerCase() === filter
+  )
+  const filters = [
+    ['all', 'All'],
+    ['pending', 'Pending'],
+    ['confirmed', 'Confirmed'],
+    ['completed', 'Completed'],
+    ['cancelled', 'Cancelled'],
   ]
 
-  if (loading) {
+  if (loading) return <LoadingScreen label='Loading appointments' />
+  if (error)
     return (
-      <div className="flex items-center justify-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-800"></div>
-        <span className="ml-2 text-gray-500">Loading appointments...</span>
-      </div>
+      <Panel title='Appointments' subtitle='Something went wrong while loading your session queue.'>
+        <div className='flex flex-col items-center gap-4 py-8 text-center'>
+          <p className='text-rose-200'>{error}</p>
+          <PrimaryButton onClick={fetchAppointments}>Retry</PrimaryButton>
+        </div>
+      </Panel>
     )
-  }
-
-  if (error) {
-    return (
-      <div className="text-center py-8">
-        <p className="text-rose-600 mb-4">{error}</p>
-        <button onClick={fetchAppointments} className="px-4 py-2 bg-teal-800 text-white rounded-xl hover:bg-teal-900">Retry</button>
-      </div>
-    )
-  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-xl font-semibold text-[#2A3F47]">Appointment Management</h2>
-          <p className="text-gray-500 text-sm">View and manage your student appointments ({appointments.length} total)</p>
+    <div className='space-y-6'>
+      <Panel
+        title='Appointment management'
+        subtitle={`Review, confirm, complete, or cancel student sessions. ${appointments.length} total loaded.`}
+        action={<GhostButton onClick={fetchAppointments}>Refresh list</GhostButton>}
+      >
+        <div className='flex flex-wrap gap-2'>
+          {filters.map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setFilter(key)}
+              className={cx(
+                'rounded-2xl px-4 py-2.5 text-sm font-medium transition',
+                filter === key
+                  ? 'bg-white text-slate-950 shadow-[0_14px_30px_rgba(255,255,255,0.12)]'
+                  : 'bg-white/[0.04] text-slate-300 hover:bg-white/[0.08] hover:text-white'
+              )}
+            >
+              {label}
+            </button>
+          ))}
         </div>
-        <button onClick={fetchAppointments} className="px-4 py-2 bg-teal-800 text-white rounded-xl hover:bg-teal-900 transition-colors text-sm font-medium">Refresh</button>
-      </div>
-
-      {/* Filter Tabs */}
-      <div className="flex flex-wrap gap-2">
-        {filterTabs.map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setFilter(key)}
-            className={`px-4 py-2 rounded-xl font-medium text-sm transition-all ${
-              filter === key ? 'bg-teal-800 text-white shadow-lg' : 'bg-white text-[#2A3F47] border border-gray-200 hover:border-teal-800 shadow-sm'
-            }`}
-          >
-            {label}
-            <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${filter === key ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'}`}>
-              {key === 'all' ? appointments.length : appointments.filter(apt => {
-                const s = apt.status?.toLowerCase()
-                if (key === 'pending') return s === 'pending' || s === 'requested'
-                return s === key
-              }).length}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      {filteredAppointments.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-2xl shadow-md">
-          <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-7 h-7 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-          </div>
-          <h3 className="text-lg font-medium text-[#2A3F47] mb-2">No appointments found</h3>
-          <p className="text-gray-500">{filter === 'all' ? "No student appointments scheduled yet." : `No ${filter} appointments found.`}</p>
-        </div>
+      </Panel>
+      {filtered.length === 0 ? (
+        <Panel title='No appointments found' subtitle='Your filtered view is empty.'>
+          <EmptyState
+            title='Nothing to review here'
+            body={
+              filter === 'all'
+                ? 'No student appointments have been scheduled yet.'
+                : `There are no ${filter} appointments right now.`
+            }
+          />
+        </Panel>
       ) : (
-        <div className="bg-white rounded-2xl shadow-md overflow-hidden">
-          <div className="h-1.5 w-full bg-teal-500"></div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-100">
-              <thead className="bg-gray-50/50">
-                <tr>
-                  {['Date & Time', 'Student', 'Type', 'Status', 'Reason', 'Priority', 'Actions'].map((h, i) => (
-                    <th key={i} className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-50">
-                {filteredAppointments.map((appointment) => (
-                  <tr key={appointment._id || appointment.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <div className="font-medium text-[#2A3F47]">{formatDate(appointment.slotStart)}</div>
-                      <div className="text-gray-400">{formatTime(appointment.slotStart)} – {formatTime(appointment.slotEnd)}</div>
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      <div className="font-medium text-[#2A3F47]">{appointment.studentId?.name || 'Anonymous Student'}</div>
-                      <div className="text-gray-400 text-xs">{appointment.studentId?.email}</div>
-                      <div className="text-gray-400 text-xs">ID: {appointment.studentId?.collegeId}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[#2A3F47]">{getModeLabel(appointment.mode)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full ${getStatusColor(appointment.status)}`}>
-                        {appointment.status || 'pending'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
-                      <div className="truncate" title={appointment.reason}>{appointment.reason || 'No reason provided'}</div>
-                      {appointment.privateNotes && <div className="text-xs text-teal-700 mt-1">Private notes available</div>}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      {appointment.urgency && (
-                        <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${
-                          appointment.urgency === 'high' ? 'bg-rose-50 text-rose-700' :
-                          appointment.urgency === 'medium' ? 'bg-amber-50 text-amber-700' :
-                          'bg-emerald-50 text-emerald-700'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${appointment.urgency === 'high' ? 'bg-rose-500' : appointment.urgency === 'medium' ? 'bg-amber-500' : 'bg-emerald-500'}`}></span>
-                          {appointment.urgency}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex flex-col gap-1">
-                        {appointment.status === 'requested' && (
-                          <div className="flex gap-1">
-                            <button onClick={() => handleConfirmAppointment(appointment._id || appointment.id)} className="text-teal-800 hover:bg-teal-50 text-xs px-2.5 py-1.5 border border-teal-200 rounded-lg transition-colors">Confirm</button>
-                            <button onClick={() => handleCancelAppointment(appointment._id || appointment.id)} className="text-rose-600 hover:bg-rose-50 text-xs px-2.5 py-1.5 border border-rose-200 rounded-lg transition-colors">Decline</button>
-                          </div>
-                        )}
-                        {appointment.status === 'confirmed' && (
-                          <div className="flex flex-wrap gap-1">
-                            <button onClick={() => handleJoinSession(appointment)} className="text-teal-800 hover:bg-teal-50 text-xs px-2.5 py-1.5 border border-teal-200 rounded-lg transition-colors">
-                              {appointment.mode === 'video' && 'Video'}
-                              {(appointment.mode === 'tele' || appointment.mode === 'chat') && 'Chat/Online'}
-                              {appointment.mode === 'in-person' && 'Prepare'}
-                            </button>
-                            <button onClick={() => handleOpenCompleteForm(appointment)} className="text-emerald-700 hover:bg-emerald-50 text-xs px-2.5 py-1.5 border border-emerald-200 rounded-lg transition-colors">Finish</button>
-                            <button onClick={() => handleCancelAppointment(appointment._id || appointment.id)} className="text-rose-600 hover:bg-rose-50 text-xs px-2.5 py-1.5 border border-rose-200 rounded-lg transition-colors">Cancel</button>
-                          </div>
-                        )}
-                        {appointment.status === 'completed' && (appointment.sessionRiskLevel || appointment.sessionSummary) && (
-                          <span className="text-xs text-gray-400" title={appointment.sessionSummary || ''}>{appointment.sessionRiskLevel || '—'} • Report saved</span>
-                        )}
-                        {(appointment.status === 'cancelled' || appointment.status === 'pending') && <span className="text-gray-400 text-xs">No actions</span>}
+        <div className='grid gap-4'>
+          {filtered.map(appointment => (
+            <div key={appointment._id || appointment.id} className={cx(card, 'p-5')}>
+              <div className='flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between'>
+                <div className='grid gap-4 md:grid-cols-[180px_1fr] xl:flex-1'>
+                  <div className='rounded-[22px] border border-cyan-300/15 bg-cyan-400/10 p-4'>
+                    <p className='text-xs uppercase tracking-[0.18em] text-cyan-100/80'>Date</p>
+                    <p className='mt-2 text-sm font-semibold text-white'>
+                      {formatDate(appointment.slotStart)}
+                    </p>
+                    <p className='mt-1 text-sm text-slate-300'>
+                      {formatTime(appointment.slotStart)} - {formatTime(appointment.slotEnd)}
+                    </p>
+                  </div>
+                  <div className='space-y-3'>
+                    <div className='flex flex-wrap items-start justify-between gap-3'>
+                      <div>
+                        <h3 className='text-lg font-semibold text-white'>
+                          {appointment.studentId?.name || 'Anonymous Student'}
+                        </h3>
+                        <p className='mt-1 text-sm text-slate-400'>
+                          {appointment.studentId?.email || 'No email available'}
+                        </p>
+                        <p className='mt-1 text-sm text-slate-400'>
+                          College ID: {appointment.studentId?.collegeId || '—'}
+                        </p>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Complete Session modal */}
-      {completeSessionAppointment && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 overflow-hidden">
-            <div className="h-1.5 w-full bg-teal-500"></div>
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-[#2A3F47] mb-2">Complete Session</h3>
-              <p className="text-sm text-gray-500 mb-4">
-                Student: <strong>{completeSessionAppointment.studentId?.name || '—'}</strong>. Add a risk level and summary.
-              </p>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Session risk level</label>
-                  <select value={completeForm.sessionRiskLevel} onChange={(e) => setCompleteForm({ ...completeForm, sessionRiskLevel: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-700 focus:border-teal-700">
-                    <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option>
-                  </select>
+                      <div className='flex flex-wrap gap-2'>
+                        <Tag className={badge(appointment.status)}>
+                          {appointment.status || 'pending'}
+                        </Tag>
+                        {appointment.urgency && (
+                          <Tag className={badge(appointment.urgency)}>
+                            {appointment.urgency} priority
+                          </Tag>
+                        )}
+                        <Tag className='bg-white/8 text-slate-200 ring-1 ring-white/10'>
+                          {modeLabel(appointment.mode)}
+                        </Tag>
+                      </div>
+                    </div>
+                    <div className='rounded-[22px] border border-white/8 bg-white/[0.03] p-4'>
+                      <p className='text-xs uppercase tracking-[0.18em] text-slate-400'>Reason</p>
+                      <p className='mt-2 text-sm leading-6 text-slate-300'>
+                        {appointment.reason || 'No reason provided.'}
+                      </p>
+                      {appointment.privateNotes && (
+                        <p className='mt-3 text-sm text-cyan-200'>
+                          Private notes available for this appointment.
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Description / summary</label>
-                  <textarea value={completeForm.sessionSummary} onChange={(e) => setCompleteForm({ ...completeForm, sessionSummary: e.target.value })} placeholder="Brief notes about the session..." rows={4} maxLength={2000} className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-700 focus:border-teal-700" />
-                </div>
-              </div>
-              <div className="flex justify-end gap-2 mt-6">
-                <button type="button" onClick={() => setCompleteSessionAppointment(null)} className="px-4 py-2 border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50">Cancel</button>
-                <button type="button" onClick={handleSubmitCompleteSession} className="px-4 py-2 bg-teal-800 text-white rounded-xl hover:bg-teal-900">Complete & save</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Availability Management Tab
-const AvailabilityTab = () => {
-  const [weeklySchedule, setWeeklySchedule] = useState({
-    monday: [{ start: '09:00', end: '17:00', isActive: true }],
-    tuesday: [{ start: '09:00', end: '17:00', isActive: true }],
-    wednesday: [{ start: '09:00', end: '17:00', isActive: true }],
-    thursday: [{ start: '09:00', end: '17:00', isActive: true }],
-    friday: [{ start: '09:00', end: '17:00', isActive: true }],
-    saturday: [],
-    sunday: []
-  })
-  const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-[#2A3F47]">Availability Schedule</h2>
-        <p className="text-gray-500 text-sm">Set your weekly availability for student appointments</p>
-      </div>
-
-      <div className="bg-white rounded-2xl shadow-md overflow-hidden">
-        <div className="h-1.5 w-full bg-teal-500"></div>
-        <div className="p-6">
-          <h3 className="text-lg font-medium text-[#2A3F47] mb-4">Weekly Schedule</h3>
-          <div className="space-y-3">
-            {days.map((day) => (
-              <div key={day} className="flex items-center space-x-4 p-4 border border-gray-100 rounded-xl hover:bg-gray-50/50 transition-colors">
-                <div className="w-24">
-                  <label className="block text-sm font-medium text-[#2A3F47] capitalize">{day}</label>
-                </div>
-                <div className="flex-1">
-                  {weeklySchedule[day].length === 0 ? (
-                    <span className="text-gray-400 italic text-sm">Not available</span>
-                  ) : (
-                    <div className="flex items-center space-x-2">
-                      {weeklySchedule[day].map((slot, index) => (
-                        <div key={index} className="flex items-center space-x-2">
-                          <input type="time" value={slot.start} className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-teal-700 focus:border-teal-700" />
-                          <span className="text-gray-400 text-sm">to</span>
-                          <input type="time" value={slot.end} className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-teal-700 focus:border-teal-700" />
-                        </div>
-                      ))}
+                <div className='flex min-w-[220px] flex-col gap-2'>
+                  {appointment.status === 'requested' && (
+                    <>
+                      <PrimaryButton
+                        onClick={() =>
+                          patchStatus(
+                            appointment._id || appointment.id,
+                            { status: 'confirmed' },
+                            'Appointment confirmed successfully!'
+                          )
+                        }
+                      >
+                        Confirm request
+                      </PrimaryButton>
+                      <GhostButton
+                        className='text-rose-100 hover:border-rose-300/25 hover:bg-rose-500/10'
+                        onClick={() =>
+                          window.confirm('Are you sure you want to cancel this appointment?') &&
+                          patchStatus(
+                            appointment._id || appointment.id,
+                            { status: 'cancelled', cancellationReason: 'Cancelled by counsellor' },
+                            'Appointment cancelled successfully!'
+                          )
+                        }
+                      >
+                        Decline
+                      </GhostButton>
+                    </>
+                  )}
+                  {appointment.status === 'confirmed' && (
+                    <>
+                      <PrimaryButton onClick={() => handleJoin(appointment)}>
+                        {appointment.mode === 'video'
+                          ? 'Join video session'
+                          : ['tele', 'chat'].includes(appointment.mode)
+                            ? 'Open chat session'
+                            : 'Prepare session'}
+                      </PrimaryButton>
+                      <GhostButton
+                        className='text-emerald-100 hover:border-emerald-300/25 hover:bg-emerald-500/10'
+                        onClick={() => {
+                          setCompleteAppointment(appointment)
+                          setCompleteForm({ sessionRiskLevel: 'low', sessionSummary: '' })
+                        }}
+                      >
+                        Mark complete
+                      </GhostButton>
+                      <GhostButton
+                        className='text-rose-100 hover:border-rose-300/25 hover:bg-rose-500/10'
+                        onClick={() =>
+                          window.confirm('Are you sure you want to cancel this appointment?') &&
+                          patchStatus(
+                            appointment._id || appointment.id,
+                            { status: 'cancelled', cancellationReason: 'Cancelled by counsellor' },
+                            'Appointment cancelled successfully!'
+                          )
+                        }
+                      >
+                        Cancel session
+                      </GhostButton>
+                    </>
+                  )}
+                  {appointment.status === 'completed' && (
+                    <div className='rounded-[20px] border border-emerald-400/15 bg-emerald-500/10 p-4 text-sm text-emerald-100'>
+                      {appointment.sessionRiskLevel || 'No risk level'}{' '}
+                      {appointment.sessionSummary ? '• Report saved' : ''}
+                    </div>
+                  )}
+                  {['cancelled', 'pending'].includes(appointment.status) && (
+                    <div className='rounded-[20px] border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-400'>
+                      No actions available.
                     </div>
                   )}
                 </div>
-                <div className="flex space-x-2">
-                  <button className="text-teal-800 hover:text-teal-900 text-sm font-medium">Add Slot</button>
-                  {weeklySchedule[day].length > 0 && <button className="text-rose-600 hover:text-rose-700 text-sm font-medium">Remove</button>}
-                </div>
               </div>
-            ))}
-          </div>
-          <div className="mt-6 flex justify-end">
-            <button className="bg-teal-800 text-white px-5 py-2.5 rounded-xl hover:bg-teal-900 font-medium text-sm">Save Schedule</button>
-          </div>
+            </div>
+          ))}
         </div>
-      </div>
+      )}
+      {completeAppointment && (
+        <Modal>
+          <div className='border-b border-white/8 px-6 py-5 sm:px-7'>
+            <h3 className='text-xl font-semibold text-white'>Complete session</h3>
+            <p className='mt-1 text-sm text-slate-400'>
+              Add a risk level and concise summary for{' '}
+              {completeAppointment.studentId?.name || 'this student'}.
+            </p>
+          </div>
+          <div className='space-y-5 px-6 py-6 sm:px-7'>
+            <div>
+              <label className='mb-2 block text-sm font-medium text-slate-300'>
+                Session risk level
+              </label>
+              <SelectField
+                value={completeForm.sessionRiskLevel}
+                onChange={event =>
+                  setCompleteForm({ ...completeForm, sessionRiskLevel: event.target.value })
+                }
+              >
+                <option value='low'>Low</option>
+                <option value='medium'>Medium</option>
+                <option value='high'>High</option>
+                <option value='critical'>Critical</option>
+              </SelectField>
+            </div>
+            <div>
+              <label className='mb-2 block text-sm font-medium text-slate-300'>
+                Session summary
+              </label>
+              <AreaField
+                rows={5}
+                maxLength={2000}
+                value={completeForm.sessionSummary}
+                onChange={event =>
+                  setCompleteForm({ ...completeForm, sessionSummary: event.target.value })
+                }
+                placeholder='Brief notes about the student, interventions, and any follow-up.'
+              />
+            </div>
+            <div className='flex flex-col gap-3 sm:flex-row sm:justify-end'>
+              <GhostButton onClick={() => setCompleteAppointment(null)}>Cancel</GhostButton>
+              <PrimaryButton
+                onClick={() =>
+                  patchStatus(
+                    completeAppointment._id || completeAppointment.id,
+                    {
+                      status: 'completed',
+                      sessionRiskLevel: completeForm.sessionRiskLevel,
+                      sessionSummary: completeForm.sessionSummary.trim() || undefined,
+                    },
+                    'Session marked complete and report saved.'
+                  )
+                }
+              >
+                Complete and save
+              </PrimaryButton>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }
+const AvailabilityTab = () => {
+  const [schedule, setSchedule] = useState(defaultSchedule)
+  const [saved, setSaved] = useState(false)
 
-// Session Reports Tab
+  useEffect(() => {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (stored) {
+      try {
+        setSchedule(JSON.parse(stored))
+      } catch (error) {
+        console.error('Failed to parse saved availability schedule:', error)
+      }
+    }
+  }, [])
+
+  const updateSlot = (day, index, field, value) => {
+    setSchedule(current => ({
+      ...current,
+      [day]: current[day].map((slot, slotIndex) =>
+        slotIndex === index ? { ...slot, [field]: value } : slot
+      ),
+    }))
+    setSaved(false)
+  }
+  const addSlot = day => {
+    setSchedule(current => ({
+      ...current,
+      [day]: [...current[day], { start: '09:00', end: '17:00' }],
+    }))
+    setSaved(false)
+  }
+  const removeSlot = (day, index) => {
+    setSchedule(current => ({
+      ...current,
+      [day]: current[day].filter((_, slotIndex) => slotIndex !== index),
+    }))
+    setSaved(false)
+  }
+  const toggleDay = day => {
+    setSchedule(current => ({
+      ...current,
+      [day]: current[day].length ? [] : [{ start: '09:00', end: '17:00' }],
+    }))
+    setSaved(false)
+  }
+  const saveSchedule = () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(schedule))
+    setSaved(true)
+    window.setTimeout(() => setSaved(false), 2400)
+  }
+
+  return (
+    <Panel
+      title='Availability schedule'
+      subtitle='Shape your working week with an editable dark-mode planner. Changes are saved locally on this device.'
+      action={<PrimaryButton onClick={saveSchedule}>Save schedule</PrimaryButton>}
+    >
+      <div className='mb-5 flex flex-wrap items-center gap-3'>
+        <Tag className='bg-cyan-500/12 text-cyan-100 ring-1 ring-cyan-400/20'>Weekly planning</Tag>
+        <Tag className='bg-white/8 text-slate-200 ring-1 ring-white/10'>
+          {saved ? 'Changes saved' : 'Unsaved changes'}
+        </Tag>
+      </div>
+      <div className='space-y-4'>
+        {dayOrder.map(day => (
+          <div key={day} className='rounded-[24px] border border-white/10 bg-white/[0.04] p-5'>
+            <div className='flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between'>
+              <div className='min-w-[180px]'>
+                <p className='text-lg font-semibold capitalize text-white'>{day}</p>
+                <p className='mt-1 text-sm text-slate-400'>
+                  {schedule[day].length
+                    ? `${schedule[day].length} active slot${schedule[day].length > 1 ? 's' : ''}`
+                    : 'Marked unavailable'}
+                </p>
+              </div>
+              <div className='flex-1 space-y-3'>
+                {schedule[day].length === 0 ? (
+                  <div className='rounded-[18px] border border-dashed border-white/12 bg-[#09141b] px-4 py-5 text-sm text-slate-400'>
+                    No availability set for this day.
+                  </div>
+                ) : (
+                  schedule[day].map((slot, index) => (
+                    <div
+                      key={`${day}-${index}`}
+                      className='grid gap-3 rounded-[20px] border border-white/8 bg-[#09141b] p-4 md:grid-cols-[1fr_auto_1fr_auto] md:items-center'
+                    >
+                      <TextField
+                        type='time'
+                        value={slot.start}
+                        onChange={event => updateSlot(day, index, 'start', event.target.value)}
+                      />
+                      <span className='text-center text-sm text-slate-500'>to</span>
+                      <TextField
+                        type='time'
+                        value={slot.end}
+                        onChange={event => updateSlot(day, index, 'end', event.target.value)}
+                      />
+                      <GhostButton
+                        className='text-rose-100 hover:border-rose-300/25 hover:bg-rose-500/10'
+                        onClick={() => removeSlot(day, index)}
+                      >
+                        Remove
+                      </GhostButton>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className='flex flex-col gap-2 lg:w-[170px]'>
+                <PrimaryButton onClick={() => addSlot(day)}>Add slot</PrimaryButton>
+                <GhostButton onClick={() => toggleDay(day)}>
+                  {schedule[day].length ? 'Block day' : 'Enable day'}
+                </GhostButton>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Panel>
+  )
+}
+
 const ReportsTab = () => {
   const { callApi } = useApi()
   const [completed, setCompleted] = useState([])
@@ -597,273 +918,383 @@ const ReportsTab = () => {
   useEffect(() => {
     let cancelled = false
     const run = async () => {
-      setLoading(true)
       try {
         const res = await callApi('/api/v1/appointments/me?includeCompleted=true', 'GET')
         if (!cancelled && res.success && res.data) {
           const list = res.data?.appointments ?? (Array.isArray(res.data) ? res.data : [])
-          setCompleted(list.filter(a => a.status === 'completed').sort((a, b) => new Date(b.slotStart) - new Date(a.slotStart)))
+          setCompleted(
+            list
+              .filter(appointment => appointment.status === 'completed')
+              .sort((a, b) => new Date(b.slotStart) - new Date(a.slotStart))
+          )
         }
-      } catch (_) {}
+      } catch (error) {
+        console.error('Failed to load reports:', error)
+      }
       if (!cancelled) setLoading(false)
     }
     run()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [callApi])
 
-  const riskColors = { low: 'bg-emerald-50 text-emerald-700', medium: 'bg-amber-50 text-amber-700', high: 'bg-orange-50 text-orange-700', critical: 'bg-rose-50 text-rose-700' }
+  if (loading) return <LoadingScreen label='Loading session reports' />
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-[#2A3F47]">Session Reports</h2>
-        <p className="text-gray-500 text-sm">Completed sessions with risk level and description.</p>
-      </div>
-
-      <div className="bg-white rounded-2xl shadow-md overflow-hidden">
-        <div className="h-1.5 w-full bg-teal-500"></div>
-        {loading ? (
-          <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-10 w-10 border-2 border-teal-800 border-t-transparent" /></div>
-        ) : completed.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">No completed sessions yet. Finish a session from the Appointments tab.</div>
-        ) : (
-          <table className="min-w-full divide-y divide-gray-100">
-            <thead className="bg-gray-50/50">
-              <tr>
-                {['Student', 'Date', 'Level', 'Summary'].map((h, i) => (
-                  <th key={i} className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {completed.map((apt) => (
-                <tr key={apt._id} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="px-6 py-3 text-sm font-medium text-[#2A3F47]">{apt.studentId?.name ?? '—'}</td>
-                  <td className="px-6 py-3 text-sm text-gray-500">{apt.slotStart ? new Date(apt.slotStart).toLocaleString() : '—'}</td>
-                  <td className="px-6 py-3">
-                    {apt.sessionRiskLevel ? <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${riskColors[apt.sessionRiskLevel] || ''}`}>{apt.sessionRiskLevel}</span> : '—'}
-                  </td>
-                  <td className="px-6 py-3 text-sm text-gray-500 max-w-md">{apt.sessionSummary || '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </div>
+    <Panel
+      title='Session reports'
+      subtitle='Completed sessions with risk level, follow-up notes, and outcome summaries.'
+    >
+      {completed.length === 0 ? (
+        <EmptyState
+          title='No completed sessions yet'
+          body='Finish a session from the appointments tab to generate your first report entry here.'
+        />
+      ) : (
+        <div className='space-y-4'>
+          {completed.map(appointment => (
+            <div
+              key={appointment._id}
+              className='rounded-[24px] border border-white/10 bg-white/[0.04] p-5'
+            >
+              <div className='flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between'>
+                <div>
+                  <h3 className='text-lg font-semibold text-white'>
+                    {appointment.studentId?.name || 'Anonymous Student'}
+                  </h3>
+                  <p className='mt-1 text-sm text-slate-400'>
+                    {formatDateTime(appointment.slotStart)}
+                  </p>
+                </div>
+                <Tag className={badge(appointment.sessionRiskLevel || 'low')}>
+                  {appointment.sessionRiskLevel || 'No risk level'}
+                </Tag>
+              </div>
+              <div className='mt-4 rounded-[20px] border border-white/8 bg-[#09141b] p-4'>
+                <p className='text-xs uppercase tracking-[0.18em] text-slate-500'>Summary</p>
+                <p className='mt-2 text-sm leading-6 text-slate-300'>
+                  {appointment.sessionSummary || 'No summary saved for this completed session.'}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Panel>
   )
 }
 
-// Profile Tab
-const ProfileTab = ({ user }) => {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-[#2A3F47]">Profile Settings</h2>
-        <p className="text-gray-500 text-sm">Manage your counsellor profile information</p>
-      </div>
-      <div className="bg-white rounded-2xl shadow-md overflow-hidden">
-        <div className="h-1.5 w-full bg-teal-500"></div>
-        <div className="p-6">
-          <h3 className="text-lg font-medium text-[#2A3F47] mb-4">Personal Information</h3>
-          <div className="space-y-4">
-            {[
-              { label: 'Name', value: user?.name || '', type: 'text' },
-              { label: 'Email', value: user?.email || '', type: 'email' },
-              { label: 'Specialization', value: user?.specialization || 'General Counselling', type: 'text' }
-            ].map((field, i) => (
-              <div key={i}>
-                <label className="block text-sm font-medium text-gray-500 mb-1">{field.label}</label>
-                <input type={field.type} value={field.value} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-teal-700 focus:border-teal-700 bg-gray-50/50 text-[#2A3F47]" readOnly />
-              </div>
-            ))}
-            <p className="text-sm text-gray-400 mt-4">To update your profile information, please contact your administrator.</p>
+const ProfileTab = ({ user }) => (
+  <div className='grid gap-6 lg:grid-cols-[1.1fr_0.9fr]'>
+    <Panel
+      title='Profile details'
+      subtitle='A calm, readable profile view for quick account checks.'
+    >
+      <div className='space-y-4'>
+        {[
+          ['Full name', user?.name || ''],
+          ['Email address', user?.email || ''],
+          ['Specialization', user?.specialization || 'General Counselling'],
+        ].map(([label, value]) => (
+          <div key={label}>
+            <label className='mb-2 block text-sm font-medium text-slate-300'>{label}</label>
+            <TextField readOnly value={value} />
           </div>
+        ))}
+      </div>
+    </Panel>
+    <Panel title='Professional status' subtitle='Account settings and update guidance.'>
+      <div className='space-y-4'>
+        <div className='rounded-[22px] border border-emerald-400/15 bg-emerald-500/10 p-4'>
+          <p className='text-sm font-semibold text-emerald-100'>Institution-managed account</p>
+          <p className='mt-2 text-sm leading-6 text-emerald-50/80'>
+            Your profile information appears to be centrally managed. Contact your administrator if
+            you need your name, email, or specialization updated.
+          </p>
+        </div>
+        <div className='rounded-[22px] border border-white/10 bg-white/[0.04] p-4'>
+          <p className='text-sm font-semibold text-white'>Visibility</p>
+          <p className='mt-2 text-sm leading-6 text-slate-400'>
+            Students only see the profile fields your organization exposes inside booking and live
+            session flows.
+          </p>
         </div>
       </div>
-    </div>
-  )
-}
+    </Panel>
+  </div>
+)
 
-// Certification Interviews Tab
 const CertificationTab = () => {
   const [interviews, setInterviews] = useState([])
-  const [selectedInterview, setSelectedInterview] = useState(null)
-  const [showEvaluationModal, setShowEvaluationModal] = useState(false)
-  const [evaluationData, setEvaluationData] = useState({ approved: null, notes: '', recommendations: '' })
+  const [selected, setSelected] = useState(null)
+  const [evaluation, setEvaluation] = useState({ approved: null, notes: '', recommendations: '' })
 
   useEffect(() => {
-    const storedInterviews = JSON.parse(localStorage.getItem('certificationInterviews') || '[]')
-    if (storedInterviews.length === 0) {
-      const demoInterviews = [
-        { id: 1, studentId: 'user123', studentName: 'Anonymous Student #1234', counsellorId: '1', counsellorName: 'Dr. Sarah Johnson', date: '2025-09-30', time: '10:00', examScore: 87, status: 'scheduled', notes: 'Interested in peer support for anxiety and depression topics', createdAt: '2025-09-27T10:00:00.000Z' },
-        { id: 2, studentId: 'user456', studentName: 'Anonymous Student #5678', counsellorId: '1', counsellorName: 'Dr. Sarah Johnson', date: '2025-09-28', time: '14:30', examScore: 92, status: 'completed', evaluation: { approved: true, notes: 'Excellent understanding of peer support principles.', recommendations: 'Recommended for certification approval.', evaluatedAt: '2025-09-27T14:30:00.000Z' }, createdAt: '2025-09-25T10:00:00.000Z' }
-      ]
-      localStorage.setItem('certificationInterviews', JSON.stringify(demoInterviews))
-      setInterviews(demoInterviews)
-    } else {
-      setInterviews(storedInterviews)
-    }
+    const stored = JSON.parse(localStorage.getItem('certificationInterviews') || '[]')
+    if (stored.length === 0) {
+      localStorage.setItem('certificationInterviews', JSON.stringify(certificationSeed))
+      setInterviews(certificationSeed)
+    } else setInterviews(stored)
   }, [])
 
-  const handleCompleteInterview = (interview) => { setSelectedInterview(interview); setShowEvaluationModal(true) }
-
-  const handleSubmitEvaluation = () => {
-    const updatedInterviews = interviews.map(interview => {
-      if (interview.id === selectedInterview.id) {
-        return { ...interview, status: 'completed', evaluation: { ...evaluationData, evaluatedAt: new Date().toISOString() } }
-      }
-      return interview
-    })
-    setInterviews(updatedInterviews)
-    localStorage.setItem('certificationInterviews', JSON.stringify(updatedInterviews))
-    if (evaluationData.approved) {
-      const certificationQueue = JSON.parse(localStorage.getItem('certificationQueue') || '[]')
-      certificationQueue.push({ id: Date.now(), studentId: selectedInterview.studentId, studentName: selectedInterview.studentName, examScore: selectedInterview.examScore, interviewDate: selectedInterview.date, counsellorName: selectedInterview.counsellorName, counsellorNotes: evaluationData.notes, status: 'pending_admin_approval', submittedAt: new Date().toISOString() })
-      localStorage.setItem('certificationQueue', JSON.stringify(certificationQueue))
+  const closeModal = () => {
+    setSelected(null)
+    setEvaluation({ approved: null, notes: '', recommendations: '' })
+  }
+  const submitEvaluation = () => {
+    const updated = interviews.map(interview =>
+      interview.id === selected.id
+        ? {
+            ...interview,
+            status: 'completed',
+            evaluation: { ...evaluation, evaluatedAt: new Date().toISOString() },
+          }
+        : interview
+    )
+    setInterviews(updated)
+    localStorage.setItem('certificationInterviews', JSON.stringify(updated))
+    if (evaluation.approved) {
+      const queue = JSON.parse(localStorage.getItem('certificationQueue') || '[]')
+      queue.push({
+        id: Date.now(),
+        studentId: selected.studentId,
+        studentName: selected.studentName,
+        examScore: selected.examScore,
+        interviewDate: selected.date,
+        counsellorName: selected.counsellorName,
+        counsellorNotes: evaluation.notes,
+        status: 'pending_admin_approval',
+        submittedAt: new Date().toISOString(),
+      })
+      localStorage.setItem('certificationQueue', JSON.stringify(queue))
     }
-    setShowEvaluationModal(false); setSelectedInterview(null); setEvaluationData({ approved: null, notes: '', recommendations: '' })
+    closeModal()
   }
 
-  const formatDate = (ds) => new Date(ds).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
-  const scheduledInterviews = interviews.filter(i => i.status === 'scheduled')
-  const completedInterviews = interviews.filter(i => i.status === 'completed')
+  const scheduled = interviews.filter(interview => interview.status === 'scheduled')
+  const completed = interviews.filter(interview => interview.status === 'completed')
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white rounded-2xl shadow-md overflow-hidden">
-        <div className="h-1.5 w-full bg-teal-500"></div>
-        <div className="p-6">
-          <h2 className="text-xl font-semibold text-[#2A3F47] mb-2">Certification Interview Management</h2>
-          <p className="text-gray-500 text-sm mb-6">Review and evaluate students who have completed peer support training.</p>
-
-          {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            {[
-              { label: 'Scheduled Interviews', value: scheduledInterviews.length, accent: 'bg-sky-500' },
-              { label: 'Approved Students', value: completedInterviews.filter(i => i.evaluation?.approved).length, accent: 'bg-emerald-500' },
-              { label: 'Need More Training', value: completedInterviews.filter(i => i.evaluation?.approved === false).length, accent: 'bg-rose-500' }
-            ].map((s, i) => (
-              <div key={i} className="bg-gray-50 rounded-xl overflow-hidden">
-                <div className={`h-1 w-full ${s.accent}`}></div>
-                <div className="p-4">
-                  <div className="text-2xl font-bold text-[#2A3F47]">{s.value}</div>
-                  <div className="text-sm text-gray-500">{s.label}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Scheduled */}
-          <div className="mb-8">
-            <h3 className="text-lg font-semibold text-[#2A3F47] mb-4">Scheduled Interviews</h3>
-            {scheduledInterviews.length > 0 ? (
-              <div className="space-y-3">
-                {scheduledInterviews.map((interview) => (
-                  <div key={interview.id} className="border border-gray-100 rounded-xl p-4 hover:bg-gray-50/50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-4">
-                          <div>
-                            <h4 className="font-medium text-[#2A3F47]">{interview.studentName}</h4>
-                            <p className="text-sm text-gray-500">{formatDate(interview.date)} at {interview.time}</p>
-                          </div>
-                          <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs rounded-full font-medium">Exam Score: {interview.examScore}%</span>
-                        </div>
-                        {interview.notes && <p className="text-sm text-gray-500 mt-2"><strong>Student Notes:</strong> {interview.notes}</p>}
+    <div className='space-y-6'>
+      <div className='grid gap-4 md:grid-cols-3'>
+        <StatCard
+          label='Scheduled'
+          value={scheduled.length}
+          hint='Interviews awaiting completion'
+          accent='bg-cyan-400'
+        />
+        <StatCard
+          label='Approved'
+          value={completed.filter(interview => interview.evaluation?.approved).length}
+          hint='Students recommended for certification'
+          accent='bg-emerald-400'
+        />
+        <StatCard
+          label='More training'
+          value={completed.filter(interview => interview.evaluation?.approved === false).length}
+          hint='Students requiring additional preparation'
+          accent='bg-rose-400'
+        />
+      </div>
+      <Panel
+        title='Certification interview management'
+        subtitle='Evaluate students who completed peer support training and forward approved recommendations.'
+      >
+        <div className='space-y-8'>
+          <div>
+            <h3 className='text-lg font-semibold text-white'>Scheduled interviews</h3>
+            <p className='mt-1 text-sm text-slate-400'>Upcoming candidates ready for review.</p>
+            <div className='mt-4 space-y-4'>
+              {scheduled.length === 0 ? (
+                <EmptyState
+                  title='No scheduled interviews'
+                  body='When candidates book their final assessment, they will appear here.'
+                />
+              ) : (
+                scheduled.map(interview => (
+                  <div
+                    key={interview.id}
+                    className='rounded-[24px] border border-white/10 bg-white/[0.04] p-5'
+                  >
+                    <div className='flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between'>
+                      <div>
+                        <h4 className='text-lg font-semibold text-white'>
+                          {interview.studentName}
+                        </h4>
+                        <p className='mt-1 text-sm text-slate-400'>
+                          {formatLongDate(interview.date)} at {interview.time}
+                        </p>
+                        <p className='mt-2 text-sm text-slate-300'>
+                          Exam score: {interview.examScore}%
+                        </p>
+                        {interview.notes && (
+                          <p className='mt-3 max-w-3xl text-sm leading-6 text-slate-400'>
+                            {interview.notes}
+                          </p>
+                        )}
                       </div>
-                      <button onClick={() => handleCompleteInterview(interview)} className="px-4 py-2 bg-teal-800 text-white rounded-xl hover:bg-teal-900 transition-colors text-sm font-medium">Complete Interview</button>
+                      <PrimaryButton onClick={() => setSelected(interview)}>
+                        Complete interview
+                      </PrimaryButton>
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : <p className="text-gray-400 text-center py-8">No scheduled interviews</p>}
+                ))
+              )}
+            </div>
           </div>
-
-          {/* Completed */}
           <div>
-            <h3 className="text-lg font-semibold text-[#2A3F47] mb-4">Completed Interviews</h3>
-            {completedInterviews.length > 0 ? (
-              <div className="space-y-3">
-                {completedInterviews.map((interview) => (
-                  <div key={interview.id} className="border border-gray-100 rounded-xl p-4 hover:bg-gray-50/50 transition-colors">
-                    <div className="flex items-center justify-between mb-2">
+            <h3 className='text-lg font-semibold text-white'>Completed interviews</h3>
+            <p className='mt-1 text-sm text-slate-400'>Reviewed outcomes and recommendations.</p>
+            <div className='mt-4 space-y-4'>
+              {completed.length === 0 ? (
+                <EmptyState
+                  title='No completed interviews yet'
+                  body='Completed certification assessments will show up here with your recommendations.'
+                />
+              ) : (
+                completed.map(interview => (
+                  <div
+                    key={interview.id}
+                    className='rounded-[24px] border border-white/10 bg-white/[0.04] p-5'
+                  >
+                    <div className='flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between'>
                       <div>
-                        <h4 className="font-medium text-[#2A3F47]">{interview.studentName}</h4>
-                        <p className="text-sm text-gray-500">Interviewed on {formatDate(interview.date)} · Exam Score: {interview.examScore}%</p>
+                        <h4 className='text-lg font-semibold text-white'>
+                          {interview.studentName}
+                        </h4>
+                        <p className='mt-1 text-sm text-slate-400'>
+                          Interviewed on {formatLongDate(interview.date)} · Exam score:{' '}
+                          {interview.examScore}%
+                        </p>
                       </div>
-                      {interview.evaluation?.approved ? (
-                        <span className="px-3 py-1 bg-emerald-50 text-emerald-700 text-sm rounded-full font-medium">Approved for Certification</span>
-                      ) : (
-                        <span className="px-3 py-1 bg-rose-50 text-rose-700 text-sm rounded-full font-medium">Needs More Training</span>
-                      )}
+                      <Tag
+                        className={
+                          interview.evaluation?.approved
+                            ? 'bg-emerald-500/12 text-emerald-100 ring-1 ring-emerald-400/20'
+                            : 'bg-rose-500/12 text-rose-100 ring-1 ring-rose-400/20'
+                        }
+                      >
+                        {interview.evaluation?.approved
+                          ? 'Approved for certification'
+                          : 'Needs more training'}
+                      </Tag>
                     </div>
                     {interview.evaluation?.notes && (
-                      <div className="bg-gray-50 rounded-xl p-3 mt-3">
-                        <p className="text-sm text-gray-600"><strong>Evaluation Notes:</strong> {interview.evaluation.notes}</p>
-                        {interview.evaluation.recommendations && <p className="text-sm text-gray-600 mt-2"><strong>Recommendations:</strong> {interview.evaluation.recommendations}</p>}
+                      <div className='mt-4 rounded-[20px] border border-white/8 bg-[#09141b] p-4'>
+                        <p className='text-xs uppercase tracking-[0.18em] text-slate-500'>
+                          Evaluation notes
+                        </p>
+                        <p className='mt-2 text-sm leading-6 text-slate-300'>
+                          {interview.evaluation.notes}
+                        </p>
+                        {interview.evaluation.recommendations && (
+                          <>
+                            <p className='mt-4 text-xs uppercase tracking-[0.18em] text-slate-500'>
+                              Recommendations
+                            </p>
+                            <p className='mt-2 text-sm leading-6 text-slate-300'>
+                              {interview.evaluation.recommendations}
+                            </p>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
-                ))}
-              </div>
-            ) : <p className="text-gray-400 text-center py-8">No completed interviews</p>}
-          </div>
-        </div>
-      </div>
-
-      {/* Evaluation Modal */}
-      {showEvaluationModal && selectedInterview && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto overflow-hidden shadow-xl">
-            <div className="h-1.5 w-full bg-teal-500"></div>
-            <div className="p-6">
-              <h3 className="text-xl font-semibold text-[#2A3F47] mb-4">Interview Evaluation – {selectedInterview.studentName}</h3>
-
-              <div className="space-y-4 mb-6">
-                <div className="bg-[#F9E6D0]/50 rounded-xl p-4">
-                  <h4 className="font-medium text-[#2A3F47] mb-2">Student Information</h4>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div><span className="text-gray-500 font-medium">Exam Score:</span> <span className="text-[#2A3F47] ml-2">{selectedInterview.examScore}%</span></div>
-                    <div><span className="text-gray-500 font-medium">Interview Date:</span> <span className="text-[#2A3F47] ml-2">{formatDate(selectedInterview.date)}</span></div>
-                  </div>
-                  {selectedInterview.notes && (
-                    <div className="mt-2"><span className="text-gray-500 font-medium text-sm">Student Notes:</span><p className="text-[#2A3F47] text-sm mt-1">{selectedInterview.notes}</p></div>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Certification Recommendation *</label>
-                  <div className="space-y-2">
-                    <label className="flex items-center">
-                      <input type="radio" name="approved" checked={evaluationData.approved === true} onChange={() => setEvaluationData({...evaluationData, approved: true})} className="mr-2 accent-teal-800" />
-                      <span className="text-emerald-700 font-medium">Approve for Certification</span>
-                    </label>
-                    <label className="flex items-center">
-                      <input type="radio" name="approved" checked={evaluationData.approved === false} onChange={() => setEvaluationData({...evaluationData, approved: false})} className="mr-2 accent-teal-800" />
-                      <span className="text-rose-700 font-medium">Needs Additional Training</span>
-                    </label>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Evaluation Notes *</label>
-                  <textarea rows={4} value={evaluationData.notes} onChange={(e) => setEvaluationData({...evaluationData, notes: e.target.value})} placeholder="Provide detailed feedback..." className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-700" />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Recommendations (Optional)</label>
-                  <textarea rows={3} value={evaluationData.recommendations} onChange={(e) => setEvaluationData({...evaluationData, recommendations: e.target.value})} placeholder="Any specific recommendations..." className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-700" />
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <button onClick={handleSubmitEvaluation} disabled={evaluationData.approved === null || !evaluationData.notes} className="flex-1 px-4 py-2.5 bg-teal-800 text-white rounded-xl hover:bg-teal-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium">Submit Evaluation</button>
-                <button onClick={() => { setShowEvaluationModal(false); setSelectedInterview(null); setEvaluationData({ approved: null, notes: '', recommendations: '' }) }} className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium">Cancel</button>
-              </div>
+                ))
+              )}
             </div>
           </div>
         </div>
+      </Panel>
+      {selected && (
+        <Modal>
+          <div className='border-b border-white/8 px-6 py-5 sm:px-7'>
+            <h3 className='text-xl font-semibold text-white'>Interview evaluation</h3>
+            <p className='mt-1 text-sm text-slate-400'>{selected.studentName}</p>
+          </div>
+          <div className='space-y-5 px-6 py-6 sm:px-7'>
+            <div className='rounded-[24px] border border-cyan-300/12 bg-cyan-400/10 p-4'>
+              <p className='text-sm text-slate-200'>Exam score: {selected.examScore}%</p>
+              <p className='mt-1 text-sm text-slate-300'>
+                Interview date: {formatLongDate(selected.date)}
+              </p>
+              {selected.notes && (
+                <p className='mt-3 text-sm leading-6 text-slate-300'>{selected.notes}</p>
+              )}
+            </div>
+            <div>
+              <label className='mb-2 block text-sm font-medium text-slate-300'>
+                Certification recommendation
+              </label>
+              <div className='grid gap-3 sm:grid-cols-2'>
+                <button
+                  type='button'
+                  onClick={() => setEvaluation({ ...evaluation, approved: true })}
+                  className={cx(
+                    'rounded-[22px] border px-4 py-4 text-left transition',
+                    evaluation.approved === true
+                      ? 'border-emerald-300/30 bg-emerald-500/12 text-emerald-50'
+                      : 'border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.06]'
+                  )}
+                >
+                  <p className='font-semibold'>Approve</p>
+                  <p className='mt-1 text-sm opacity-80'>
+                    Recommend the student for certification.
+                  </p>
+                </button>
+                <button
+                  type='button'
+                  onClick={() => setEvaluation({ ...evaluation, approved: false })}
+                  className={cx(
+                    'rounded-[22px] border px-4 py-4 text-left transition',
+                    evaluation.approved === false
+                      ? 'border-rose-300/30 bg-rose-500/12 text-rose-50'
+                      : 'border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.06]'
+                  )}
+                >
+                  <p className='font-semibold'>Needs more training</p>
+                  <p className='mt-1 text-sm opacity-80'>
+                    Request more development before certification.
+                  </p>
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className='mb-2 block text-sm font-medium text-slate-300'>
+                Evaluation notes
+              </label>
+              <AreaField
+                rows={5}
+                value={evaluation.notes}
+                onChange={event => setEvaluation({ ...evaluation, notes: event.target.value })}
+                placeholder='Provide detailed feedback on readiness, communication, judgment, and next steps.'
+              />
+            </div>
+            <div>
+              <label className='mb-2 block text-sm font-medium text-slate-300'>
+                Recommendations
+              </label>
+              <AreaField
+                rows={4}
+                value={evaluation.recommendations}
+                onChange={event =>
+                  setEvaluation({ ...evaluation, recommendations: event.target.value })
+                }
+                placeholder='Optional recommendations for further practice, supervision, or placement.'
+              />
+            </div>
+            <div className='flex flex-col gap-3 sm:flex-row sm:justify-end'>
+              <GhostButton onClick={closeModal}>Cancel</GhostButton>
+              <PrimaryButton
+                disabled={evaluation.approved === null || !evaluation.notes.trim()}
+                onClick={submitEvaluation}
+              >
+                Submit evaluation
+              </PrimaryButton>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   )
