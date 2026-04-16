@@ -59,9 +59,17 @@ class LLMRiskSignal(BaseModel):
     """Structured risk assessment from the LLM."""
     suicidal_ideation: float = 0.0
     self_harm_risk: float = 0.0
+    suicidal_intent: float = 0.0
+    suicide_plan: float = 0.0
+    access_to_means: float = 0.0
+    recent_self_harm: float = 0.0
     crisis_severity: float = 0.0
     emotional_distress: float = 0.0
     hopelessness: float = 0.0
+    burdensomeness: float = 0.0
+    isolation_withdrawal: float = 0.0
+    impulsivity: float = 0.0
+    substance_use_risk: float = 0.0
     overall_risk: str = "low"
     confidence: float = 0.0
     concerns: list[str] = Field(default_factory=list)

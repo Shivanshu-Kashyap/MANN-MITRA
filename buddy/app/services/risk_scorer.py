@@ -97,15 +97,54 @@ class RiskScorer:
         level_map = {"critical": 90, "high": 70, "medium": 40, "low": 10}
         level_score = level_map.get(signal.overall_risk, 10)
 
-        dimension_score = max(
-            signal.suicidal_ideation,
-            signal.self_harm_risk,
+        life_threat_score = max(
             signal.crisis_severity,
+            signal.suicidal_intent * 0.98,
+            signal.suicide_plan * 1.00,
+            signal.access_to_means * 0.95,
+            signal.recent_self_harm * 0.93,
+        )
+
+        self_harm_score = max(
+            signal.self_harm_risk,
+            signal.recent_self_harm * 0.92,
+        )
+
+        ideation_score = max(
+            signal.suicidal_ideation,
+            signal.suicidal_intent * 0.94,
             signal.hopelessness * 0.85,
+            signal.burdensomeness * 0.82,
+            signal.isolation_withdrawal * 0.78,
             signal.emotional_distress * 0.7,
+        )
+
+        destabilization_score = max(
+            signal.impulsivity * 0.78,
+            signal.substance_use_risk * 0.74,
+            signal.emotional_distress * 0.68,
+        )
+
+        dimension_score = max(
+            life_threat_score,
+            self_harm_score,
+            ideation_score,
+            destabilization_score,
         ) * 100
 
-        raw = max(level_score, dimension_score)
+        synergy_bonus = 0
+        if signal.suicidal_intent >= 0.6 and signal.suicide_plan >= 0.55:
+            synergy_bonus += 10
+        if signal.suicide_plan >= 0.55 and signal.access_to_means >= 0.55:
+            synergy_bonus += 10
+        if signal.suicidal_ideation >= 0.6 and signal.hopelessness >= 0.6:
+            synergy_bonus += 6
+        if signal.self_harm_risk >= 0.6 and signal.impulsivity >= 0.55:
+            synergy_bonus += 5
+        if signal.recent_self_harm >= 0.55:
+            synergy_bonus += 8
+
+        raw = min(max(level_score, dimension_score) + synergy_bonus, 100)
         return int(min(round(raw * signal.confidence + raw * (1 - signal.confidence) * 0.8), 100))
 
     # ── Signal 3: Semantic ──
@@ -142,6 +181,13 @@ class RiskScorer:
                 score = settings.RISK_THRESHOLD_CRITICAL
             if llm_signal.suicidal_ideation >= 0.8 and score < settings.RISK_THRESHOLD_HIGH:
                 score = settings.RISK_THRESHOLD_HIGH
+            if (
+                llm_signal.suicidal_intent >= 0.75
+                or llm_signal.suicide_plan >= 0.7
+                or llm_signal.access_to_means >= 0.75
+                or llm_signal.recent_self_harm >= 0.75
+            ) and score < settings.RISK_THRESHOLD_CRITICAL:
+                score = settings.RISK_THRESHOLD_CRITICAL
 
         return score
 
@@ -241,6 +287,26 @@ class RiskScorer:
 
         if llm_signal and llm_signal.available and llm_signal.concerns:
             parts.append(f"LLM concerns: {', '.join(llm_signal.concerns[:3])}")
+        elif llm_signal and llm_signal.available:
+            llm_factors: list[str] = []
+            if llm_signal.suicidal_intent >= 0.5:
+                llm_factors.append("suicidal intent")
+            if llm_signal.suicide_plan >= 0.45:
+                llm_factors.append("suicide planning")
+            if llm_signal.access_to_means >= 0.45:
+                llm_factors.append("access to means")
+            if llm_signal.recent_self_harm >= 0.45:
+                llm_factors.append("recent self-harm")
+            if llm_signal.burdensomeness >= 0.5:
+                llm_factors.append("burdensomeness")
+            if llm_signal.isolation_withdrawal >= 0.5:
+                llm_factors.append("social withdrawal")
+            if llm_signal.impulsivity >= 0.5:
+                llm_factors.append("impulsivity")
+            if llm_signal.substance_use_risk >= 0.5:
+                llm_factors.append("substance-linked risk")
+            if llm_factors:
+                parts.append(f"LLM factors: {', '.join(llm_factors[:4])}")
 
         if semantic_signal and semantic_signal.available and semantic_signal.max_similarity > 0.55:
             parts.append(f"semantic match: {semantic_signal.matched_category}")

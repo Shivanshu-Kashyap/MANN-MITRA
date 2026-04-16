@@ -25,11 +25,19 @@ _SYSTEM_PROMPT = (
     "Analyze the user's latest message (and conversation history when provided) "
     "for psychological risk signals.\n\n"
     "Rate each dimension from 0.0 (absent) to 1.0 (extreme):\n"
-    "- suicidal_ideation: death wishes, planning, farewell behavior, implicit longing for death\n"
-    "- self_harm_risk: urge or intent to physically hurt oneself\n"
+    "- suicidal_ideation: passive or active desire for death, disappearance, or not wanting to live\n"
+    "- self_harm_risk: non-suicidal or suicidal urge to physically injure oneself\n"
+    "- suicidal_intent: desire or readiness to act on suicidal thoughts\n"
+    "- suicide_plan: planning, timing, method selection, goodbye behavior, rehearsal, preparation\n"
+    "- access_to_means: access to pills, blades, rope, heights, weapons, poison, or other lethal means\n"
+    "- recent_self_harm: recent self-injury, suicide attempt, rehearsal, or aborted attempt\n"
     "- crisis_severity: immediate danger or acute psychological emergency\n"
     "- emotional_distress: overall emotional pain and suffering level\n"
     "- hopelessness: feeling trapped, no future, giving up, burden to others\n\n"
+    "- burdensomeness: belief that others are better off without them or they are a burden\n"
+    "- isolation_withdrawal: social withdrawal, saying goodbye, cutting off contact, feeling alone\n"
+    "- impulsivity: unstable, agitated, reckless, or likely to act suddenly\n"
+    "- substance_use_risk: alcohol or drug use that could increase self-harm or suicide risk\n\n"
     "Also provide:\n"
     "- overall_risk: one of \"low\", \"medium\", \"high\", \"critical\"\n"
     "- confidence: your assessment confidence 0.0-1.0\n"
@@ -38,10 +46,16 @@ _SYSTEM_PROMPT = (
     "- When uncertain, err toward HIGHER risk (false negatives are dangerous)\n"
     "- Implicit ideation counts (e.g. 'nobody would care if I disappeared')\n"
     "- Consider escalating distress patterns across conversation history\n"
+    "- Distinguish passive ideation, suicidal intent, concrete planning, and non-suicidal self-harm\n"
+    "- Planning plus access to means should strongly increase risk\n"
+    "- Recent attempt, rehearsal, or self-harm should strongly increase risk\n"
     "- The user may write in Hindi or Hinglish\n\n"
     "Respond with ONLY valid JSON (no markdown fences, no commentary):\n"
-    '{"suicidal_ideation":0.0,"self_harm_risk":0.0,"crisis_severity":0.0,'
-    '"emotional_distress":0.0,"hopelessness":0.0,"overall_risk":"low",'
+    '{"suicidal_ideation":0.0,"self_harm_risk":0.0,"suicidal_intent":0.0,'
+    '"suicide_plan":0.0,"access_to_means":0.0,"recent_self_harm":0.0,'
+    '"crisis_severity":0.0,"emotional_distress":0.0,"hopelessness":0.0,'
+    '"burdensomeness":0.0,"isolation_withdrawal":0.0,"impulsivity":0.0,'
+    '"substance_use_risk":0.0,"overall_risk":"low",'
     '"confidence":0.0,"concerns":[]}'
 )
 
@@ -80,9 +94,17 @@ def _parse_llm_json(text: str) -> LLMRiskSignal:
     return LLMRiskSignal(
         suicidal_ideation=_clamp(data.get("suicidal_ideation", 0)),
         self_harm_risk=_clamp(data.get("self_harm_risk", 0)),
+        suicidal_intent=_clamp(data.get("suicidal_intent", 0)),
+        suicide_plan=_clamp(data.get("suicide_plan", 0)),
+        access_to_means=_clamp(data.get("access_to_means", 0)),
+        recent_self_harm=_clamp(data.get("recent_self_harm", 0)),
         crisis_severity=_clamp(data.get("crisis_severity", 0)),
         emotional_distress=_clamp(data.get("emotional_distress", 0)),
         hopelessness=_clamp(data.get("hopelessness", 0)),
+        burdensomeness=_clamp(data.get("burdensomeness", 0)),
+        isolation_withdrawal=_clamp(data.get("isolation_withdrawal", 0)),
+        impulsivity=_clamp(data.get("impulsivity", 0)),
+        substance_use_risk=_clamp(data.get("substance_use_risk", 0)),
         overall_risk=str(data.get("overall_risk", "low")).lower(),
         confidence=_clamp(data.get("confidence", 0.5)),
         concerns=list(data.get("concerns") or []),
