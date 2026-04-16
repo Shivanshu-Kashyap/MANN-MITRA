@@ -185,3 +185,13 @@ body {
 main {
   flex: 1;
 }
+
+/* Hide native browser calendar picker icon on date inputs so custom icons show cleanly */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 0;
+  position: absolute;
+  right: 0;
+  width: 2.5rem;
+  height: 100%;
+  cursor: pointer;
+}

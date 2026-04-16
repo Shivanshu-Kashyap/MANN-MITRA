@@ -45,8 +45,8 @@ const appointmentSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Appointment mode is required'],
     enum: {
-      values: ['in-person', 'tele'],
-      message: 'Mode must be either in-person or tele'
+      values: ['in-person', 'tele', 'chat', 'video'],
+      message: 'Mode must be in-person, tele, chat, or video'
     },
     index: true
   },

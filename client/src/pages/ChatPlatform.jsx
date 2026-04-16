@@ -5,6 +5,9 @@ import { io } from 'socket.io-client'
 import { useApi } from '../hooks/useApi'
 import { SOCKET_URL } from '../utils/api'
 
+const APPOINTMENT_SESSION_WARN_MS = 5 * 60 * 1000
+const APPOINTMENT_EXTENSION_MINUTES = [5, 10, 15, 20, 30, 45, 60]
+
 const ChatPlatform = () => {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -46,6 +49,34 @@ const ChatPlatform = () => {
   const inputRef = useRef(null)
   const fileInputRef = useRef(null)
 
+  // Scheduled appointment session (server slotStart / slotEnd)
+  const [sessionTick, setSessionTick] = useState(0)
+  const [extendModalOpen, setExtendModalOpen] = useState(false)
+  const [dismissedExtendForEndKey, setDismissedExtendForEndKey] = useState(null)
+  const [extendSubmitting, setExtendSubmitting] = useState(false)
+
+  const isUrlTestMode = () =>
+    new URLSearchParams(window.location.search).get('test') === 'true'
+
+  const getAppointmentSessionPhase = useCallback(() => {
+    if (!currentChat) return 'unrestricted'
+    if (currentChat.type === 'test' || isUrlTestMode()) return 'active'
+    if (currentChat.type !== 'appointment') return 'unrestricted'
+    if (!currentChat.slotStart || !currentChat.slotEnd) return 'unrestricted'
+    const now = Date.now()
+    const start = new Date(currentChat.slotStart).getTime()
+    const end = new Date(currentChat.slotEnd).getTime()
+    if (now < start) return 'waiting'
+    if (now >= end) return 'ended'
+    return 'active'
+  }, [currentChat])
+
+  const getSessionRemainingMs = useCallback(() => {
+    if (!currentChat || currentChat.type === 'test' || isUrlTestMode()) return null
+    if (currentChat.type !== 'appointment' || !currentChat.slotEnd) return null
+    return new Date(currentChat.slotEnd).getTime() - Date.now()
+  }, [currentChat])
+
   // ICE servers configuration for WebRTC
   const iceServers = {
     iceServers: [
@@ -85,6 +116,56 @@ const ChatPlatform = () => {
       console.error('Error processing URL parameters:', error)
     }
   }, [searchParams, user])
+
+  useEffect(() => {
+    setDismissedExtendForEndKey(null)
+    setExtendModalOpen(false)
+  }, [currentChat?.appointmentId])
+
+  // Re-render once per second while a timed appointment session is open
+  useEffect(() => {
+    if (currentChat?.type !== 'appointment' || !currentChat?.slotEnd) return undefined
+    const id = setInterval(() => setSessionTick((n) => n + 1), 1000)
+    return () => clearInterval(id)
+  }, [currentChat?.type, currentChat?.appointmentId, currentChat?.slotEnd])
+
+  // Prompt to extend when less than SESSION_WARN_MS remains
+  useEffect(() => {
+    if (currentChat?.type !== 'appointment' || !currentChat?.slotEnd || isUrlTestMode()) return
+    const end = new Date(currentChat.slotEnd).getTime()
+    const start = new Date(currentChat.slotStart).getTime()
+    const now = Date.now()
+    const endKey = String(end)
+    if (dismissedExtendForEndKey === endKey) return
+    if (now < start || now >= end) return
+    const remaining = end - now
+    if (remaining > 0 && remaining <= APPOINTMENT_SESSION_WARN_MS) {
+      setExtendModalOpen(true)
+    }
+  }, [sessionTick, currentChat, dismissedExtendForEndKey])
+
+  useEffect(() => {
+    if (getAppointmentSessionPhase() === 'ended') {
+      setExtendModalOpen(false)
+    }
+  }, [sessionTick, getAppointmentSessionPhase])
+
+  // Close video automatically when the scheduled session ends
+  useEffect(() => {
+    if (getAppointmentSessionPhase() !== 'ended' || !inVideoCall) return
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => track.stop())
+    }
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close()
+    }
+    if (socketRef.current && currentChat?.partnerId) {
+      socketRef.current.emit('call_ended', { recipientId: currentChat.partnerId })
+    }
+    setInVideoCall(false)
+    if (localVideoRef.current) localVideoRef.current.srcObject = null
+    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null
+  }, [sessionTick, currentChat, inVideoCall, getAppointmentSessionPhase])
 
   const initializeUser = () => {
     const userData = localStorage.getItem('Mann-Mitra_user') || localStorage.getItem('user')
@@ -264,12 +345,17 @@ const ChatPlatform = () => {
           return
         }
           
+        const sessionMode = appointment.mode === 'video' ? 'video' : 'chat'
+
         setCurrentChat({
           type: 'appointment',
           appointmentId,
           partnerId: chatPartner._id || chatPartner,
           partnerName: chatPartner.name || 'Chat Partner',
-          partnerRole: partnerRole
+          partnerRole: partnerRole,
+          slotStart: appointment.slotStart,
+          slotEnd: appointment.slotEnd,
+          sessionMode
         })
 
         // Join appointment room
@@ -353,6 +439,16 @@ const ChatPlatform = () => {
       currentChatType: currentChat?.type,
       user: user 
     })
+
+    const phase = getAppointmentSessionPhase()
+    if (currentChat?.type === 'appointment' && phase !== 'active') {
+      if (phase === 'waiting') {
+        alert('Your session has not started yet. You can chat during your scheduled time window.')
+      } else if (phase === 'ended') {
+        alert('This session has ended.')
+      }
+      return
+    }
     
     if (!inputMessage.trim() || !currentChat) {
       console.warn('❌ sendMessage blocked:', { 
@@ -426,6 +522,7 @@ const ChatPlatform = () => {
 
   const handleTyping = () => {
     if (!currentChat) return
+    if (currentChat.type === 'appointment' && getAppointmentSessionPhase() !== 'active') return
     
     setIsTyping(true)
     socketRef.current.emit('typing', {
@@ -481,6 +578,17 @@ const ChatPlatform = () => {
   const startVideoCall = async () => {
     try {
       if (!currentChat) return
+
+      if (currentChat.type === 'appointment') {
+        if (currentChat.sessionMode !== 'video') {
+          alert('Video calls are only available when your booking is a video session.')
+          return
+        }
+        if (getAppointmentSessionPhase() !== 'active') {
+          alert('You can start the video call only during your scheduled session time.')
+          return
+        }
+      }
 
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: true, 
@@ -632,8 +740,8 @@ const ChatPlatform = () => {
     })
 
     setInVideoCall(false)
-    localVideoRef.current.srcObject = null
-    remoteVideoRef.current.srcObject = null
+    if (localVideoRef.current) localVideoRef.current.srcObject = null
+    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null
   }
 
   const handleCallAccepted = async ({ answer }) => {
@@ -664,6 +772,47 @@ const ChatPlatform = () => {
     if (peerConnectionRef.current) {
       await peerConnectionRef.current.addIceCandidate(candidate)
     }
+  }
+
+  const dismissExtendModal = () => {
+    if (!currentChat?.slotEnd) return
+    setDismissedExtendForEndKey(String(new Date(currentChat.slotEnd).getTime()))
+    setExtendModalOpen(false)
+  }
+
+  const submitSessionExtension = async (minutes) => {
+    if (!currentChat?.appointmentId) return
+    setExtendSubmitting(true)
+    try {
+      const response = await callApi(
+        `/api/v1/appointments/${currentChat.appointmentId}/extend`,
+        'PATCH',
+        { additionalMinutes: minutes }
+      )
+      if (response.success) {
+        const body = response.data
+        const apt = body?.appointment || body
+        if (apt?.slotEnd) {
+          setCurrentChat((prev) => (prev ? { ...prev, slotEnd: apt.slotEnd } : prev))
+        }
+        setDismissedExtendForEndKey(null)
+        setExtendModalOpen(false)
+      } else {
+        alert(response.error || 'Could not extend session')
+      }
+    } catch (e) {
+      alert(e?.message || 'Could not extend session')
+    } finally {
+      setExtendSubmitting(false)
+    }
+  }
+
+  const formatCountdown = (ms) => {
+    if (ms == null || ms <= 0) return '0:00'
+    const totalSec = Math.floor(ms / 1000)
+    const m = Math.floor(totalSec / 60)
+    const s = totalSec % 60
+    return `${m}:${s.toString().padStart(2, '0')}`
   }
 
   const toggleVideo = () => {
@@ -800,21 +949,26 @@ const ChatPlatform = () => {
             </div>
             {currentChat && !inVideoCall && !localVideoTestActive && (
               <>
-                <button
-                  onClick={startVideoCall}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                  Video Call
-                </button>
-                <button
-                  onClick={startLocalVideoTest}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium border border-gray-200"
-                  title="Test your camera and microphone"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /></svg>
-                  Test Video
-                </button>
+                {(currentChat.type !== 'appointment' ||
+                  (currentChat.sessionMode === 'video' && getAppointmentSessionPhase() === 'active')) && (
+                  <button
+                    onClick={startVideoCall}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                    Video Call
+                  </button>
+                )}
+                {currentChat.type !== 'appointment' && (
+                  <button
+                    onClick={startLocalVideoTest}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium border border-gray-200"
+                    title="Test your camera and microphone"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /></svg>
+                    Test Video
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -840,6 +994,40 @@ const ChatPlatform = () => {
                   <p className="text-sm text-gray-500 italic">{currentChat.partnerName} is typing...</p>
                 </div>
               )}
+
+              {currentChat?.type === 'appointment' && (() => {
+                const phase = getAppointmentSessionPhase()
+                const rem = getSessionRemainingMs()
+                if (phase === 'unrestricted') return null
+                return (
+                  <div
+                    className={`flex-shrink-0 px-4 py-3 text-sm border-b ${
+                      phase === 'waiting'
+                        ? 'bg-amber-50 text-amber-900 border-amber-100'
+                        : phase === 'ended'
+                          ? 'bg-rose-50 text-rose-900 border-rose-100'
+                          : 'bg-teal-50 text-teal-900 border-teal-100'
+                    }`}
+                  >
+                    {phase === 'waiting' && (
+                      <p>
+                        Your session opens at{' '}
+                        <strong>{new Date(currentChat.slotStart).toLocaleString()}</strong>.
+                        Chat and video are available only during your scheduled window.
+                      </p>
+                    )}
+                    {phase === 'ended' && (
+                      <p>This scheduled session has ended. Messaging and video are no longer available.</p>
+                    )}
+                    {phase === 'active' && (
+                      <p>
+                        {currentChat.sessionMode === 'video' ? 'Video session' : 'Online chat session'} — time
+                        remaining: <strong>{formatCountdown(rem)}</strong>
+                      </p>
+                    )}
+                  </div>
+                )
+              })()}
 
               {/* Messages Area */}
               <div
@@ -889,8 +1077,10 @@ const ChatPlatform = () => {
                 <div className="flex items-center gap-2 max-w-4xl mx-auto">
                   <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept="image/*,application/pdf,.doc,.docx" />
                   <button
+                    type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="p-2.5 text-gray-500 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
+                    disabled={currentChat?.type === 'appointment' && getAppointmentSessionPhase() !== 'active'}
+                    className="p-2.5 text-gray-500 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors disabled:opacity-40 disabled:pointer-events-none"
                     aria-label="Attach file"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
@@ -902,11 +1092,16 @@ const ChatPlatform = () => {
                     onChange={(e) => { setInputMessage(e.target.value); handleTyping() }}
                     onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
                     placeholder="Type your message..."
-                    className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent text-gray-900 placeholder-gray-400"
+                    disabled={currentChat?.type === 'appointment' && getAppointmentSessionPhase() !== 'active'}
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent text-gray-900 placeholder-gray-400 disabled:bg-gray-100 disabled:text-gray-500"
                   />
                   <button
+                    type="button"
                     onClick={sendMessage}
-                    disabled={!inputMessage.trim()}
+                    disabled={
+                      !inputMessage.trim() ||
+                      (currentChat?.type === 'appointment' && getAppointmentSessionPhase() !== 'active')
+                    }
                     className="px-5 py-3 bg-teal-600 text-white rounded-xl hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
                   >
                     Send
@@ -916,6 +1111,40 @@ const ChatPlatform = () => {
             </>
           )}
       </div>
+
+      {/* Session extension */}
+      {extendModalOpen && currentChat?.type === 'appointment' && getAppointmentSessionPhase() === 'active' && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Extend your session?</h3>
+            <p className="text-sm text-gray-600 mb-6">
+              Your scheduled time is almost up. Choose how many extra minutes you need. The other participant
+              will see the same updated end time.
+            </p>
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              {APPOINTMENT_EXTENSION_MINUTES.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  disabled={extendSubmitting}
+                  onClick={() => submitSessionExtension(m)}
+                  className="py-2.5 px-2 text-sm font-medium rounded-xl bg-teal-50 text-teal-900 hover:bg-teal-100 border border-teal-200 disabled:opacity-50"
+                >
+                  +{m} min
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={dismissExtendModal}
+              disabled={extendSubmitting}
+              className="w-full py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900 rounded-xl hover:bg-gray-50"
+            >
+              Not now
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Local Video Test modal */}
       {localVideoTestActive && (
@@ -988,6 +1217,7 @@ const ChatPlatform = () => {
             {/* Call Controls */}
             <div className="flex justify-center space-x-4 mt-6">
               <button
+                type="button"
                 onClick={toggleAudio}
                 className={`p-3 rounded-full transition-colors ${
                   callControls.audio 
@@ -999,6 +1229,7 @@ const ChatPlatform = () => {
               </button>
               
               <button
+                type="button"
                 onClick={toggleVideo}
                 className={`p-3 rounded-full transition-colors ${
                   callControls.video 
@@ -1009,7 +1240,9 @@ const ChatPlatform = () => {
                 {callControls.video ? '📹' : '🚫'}
               </button>
               
+              {currentChat?.type !== 'appointment' && (
               <button
+                type="button"
                 onClick={shareScreen}
                 className={`p-3 rounded-full transition-colors ${
                   callControls.screenShare 
@@ -1019,8 +1252,10 @@ const ChatPlatform = () => {
               >
                 📺
               </button>
+              )}
               
               <button
+                type="button"
                 onClick={endCall}
                 className="p-3 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors"
               >

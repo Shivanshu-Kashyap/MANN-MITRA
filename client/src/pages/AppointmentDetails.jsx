@@ -62,7 +62,8 @@ const AppointmentDetails = () => {
   const getModeLabel = (mode) => {
     switch (mode?.toLowerCase()) {
       case 'video': return 'Video Call'
-      case 'chat': case 'tele': return 'Online Chat'
+      case 'chat': return 'Online Chat'
+      case 'tele': return 'Online Chat'
       case 'in-person': return 'In-Person Meeting'
       default: return 'Online Session'
     }

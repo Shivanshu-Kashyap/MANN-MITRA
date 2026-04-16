@@ -5,6 +5,19 @@ import logoImage from '../assets/Mann-mitra.png'
 import { useApi } from '../hooks/useApi'
 import { BUDDY_AGENT_URL } from '../utils/api'
 import { clearStoredAuth } from '../utils/routeAuth'
+import {
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer
+} from 'recharts'
 
 const AdminDashboardNew = () => {
   const { t } = useTranslation()
@@ -288,7 +301,7 @@ const AdminDashboardNew = () => {
                 callApi={callApi}
               />
             )}
-            {activeTab === 'students' && <StudentAnalyticsTab />}
+            {activeTab === 'students' && <StudentAnalyticsTab callApi={callApi} />}
             {activeTab === 'reports' && <ReportsTab callApi={callApi} />}
             {activeTab === 'settings' && <SettingsTab adminUser={adminUser} adminName={adminName} adminEmail={adminEmail} callApi={callApi} />}
           </div>
@@ -301,6 +314,12 @@ const AdminDashboardNew = () => {
 // Risk Dashboard Tab - Real-time risk monitoring from Buddy RAG service
 const RiskDashboardTab = () => {
   const [dashboardData, setDashboardData] = useState(null)
+  const [allSessions, setAllSessions] = useState([])
+  const [showAllSessions, setShowAllSessions] = useState(false)
+  const [allSessionsLoading, setAllSessionsLoading] = useState(false)
+  const [allSessionsError, setAllSessionsError] = useState(null)
+  const [expandedSessionId, setExpandedSessionId] = useState(null)
+  const [sessionSearch, setSessionSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -327,120 +346,453 @@ const RiskDashboardTab = () => {
     }
   }
 
-  const riskColors = {
-    low: { bg: 'bg-green-900/20', text: 'text-green-400', bar: 'bg-[#00D9D9]', border: 'border-green-800' },
-    medium: { bg: 'bg-yellow-900/20', text: 'text-yellow-400', bar: 'bg-yellow-500', border: 'border-yellow-800' },
-    high: { bg: 'bg-orange-900/20', text: 'text-orange-400', bar: 'bg-orange-500', border: 'border-orange-800' },
-    critical: { bg: 'bg-red-900/20', text: 'text-red-400', bar: 'bg-red-500', border: 'border-red-800' },
+  const fetchAllRiskSessions = async () => {
+    setAllSessionsLoading(true)
+    setAllSessionsError(null)
+    try {
+      const response = await fetch(`${BUDDY_AGENT_URL}/admin/risk-sessions?limit=500&include_messages=true`)
+      if (!response.ok) {
+        setAllSessionsError('Failed to fetch full risk sessions')
+        return
+      }
+      const data = await response.json()
+      setAllSessions(Array.isArray(data.sessions) ? data.sessions : [])
+    } catch (err) {
+      setAllSessionsError('Buddy RAG service is not reachable for session history')
+    } finally {
+      setAllSessionsLoading(false)
+    }
   }
 
-  if (loading) return <div className="text-center py-12"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00D9D9] mx-auto"></div><p className="mt-4 text-gray-400">Loading risk data...</p></div>
-  if (error) return <div className="bg-red-900/20 border border-red-700 rounded-lg p-6 text-center"><p className="text-red-400 font-medium">{error}</p><button onClick={fetchRiskDashboard} className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Retry</button></div>
+  const toggleAllSessionsView = async () => {
+    const nextValue = !showAllSessions
+    setShowAllSessions(nextValue)
+    if (nextValue && allSessions.length === 0 && !allSessionsLoading) {
+      await fetchAllRiskSessions()
+    }
+  }
+
+  const riskColors = {
+    low: {
+      shell: 'border-emerald-500/25 bg-emerald-500/10',
+      text: 'text-emerald-300',
+      accent: 'bg-emerald-400',
+      soft: 'bg-emerald-500/12 text-emerald-200 border-emerald-500/25',
+      ring: 'ring-emerald-400/20'
+    },
+    medium: {
+      shell: 'border-amber-500/25 bg-amber-500/10',
+      text: 'text-amber-300',
+      accent: 'bg-amber-400',
+      soft: 'bg-amber-500/12 text-amber-200 border-amber-500/25',
+      ring: 'ring-amber-400/20'
+    },
+    high: {
+      shell: 'border-orange-500/25 bg-orange-500/10',
+      text: 'text-orange-300',
+      accent: 'bg-orange-400',
+      soft: 'bg-orange-500/12 text-orange-200 border-orange-500/25',
+      ring: 'ring-orange-400/20'
+    },
+    critical: {
+      shell: 'border-rose-500/25 bg-rose-500/10',
+      text: 'text-rose-300',
+      accent: 'bg-rose-400',
+      soft: 'bg-rose-500/12 text-rose-200 border-rose-500/25',
+      ring: 'ring-rose-400/20'
+    }
+  }
+
+  const formatTimestamp = (value) => {
+    if (!value) return 'No timestamp'
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return 'Invalid timestamp'
+    return date.toLocaleString()
+  }
+
+  const getSessionLabel = (session) =>
+    session.display_name || session.user_name || session.anonymous_id || 'Anonymous session'
+
+  if (loading) {
+    return (
+      <div className="rounded-[28px] border border-white/10 bg-[#111111] px-8 py-14 text-center shadow-[0_30px_80px_rgba(0,0,0,0.35)]">
+        <div className="mx-auto h-12 w-12 animate-spin rounded-full border-2 border-white/10 border-t-[#00D9D9]" />
+        <p className="mt-4 text-sm text-gray-400">Loading risk monitoring surface...</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-[28px] border border-rose-500/25 bg-rose-500/10 p-8 text-center shadow-[0_30px_80px_rgba(0,0,0,0.35)]">
+        <p className="text-base font-semibold text-rose-200">{error}</p>
+        <button
+          onClick={fetchRiskDashboard}
+          className="mt-4 rounded-full bg-rose-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-400"
+        >
+          Retry connection
+        </button>
+      </div>
+    )
+  }
 
   const dist = dashboardData?.severity_distribution || {}
-  const totalSessions = Object.values(dist).reduce((sum, d) => sum + (d.count || 0), 0) || 1
+  const totalSessions = Object.values(dist).reduce((sum, item) => sum + (item.count || 0), 0)
+  const highRiskCases = dashboardData?.high_risk_cases || []
+  const recentAlerts = dashboardData?.recent_alerts || []
+  const criticalCount = dist.critical?.count || 0
+  const highCount = dist.high?.count || 0
+  const latestAlertTime = recentAlerts[0]?.created_at
+  const highestCaseScore = highRiskCases.reduce((max, item) => Math.max(max, item.risk_score || 0), 0)
+  const monitoredUsers = new Set(
+    [...highRiskCases, ...recentAlerts].map((item) => item.session_id || item.anonymous_id || item.user_name).filter(Boolean)
+  ).size
+  const filteredSessions = allSessions.filter((session) => {
+    const search = sessionSearch.trim().toLowerCase()
+    if (!search) return true
+    const display = getSessionLabel(session).toLowerCase()
+    const sessionId = (session.session_id || '').toLowerCase()
+    return display.includes(search) || sessionId.includes(search)
+  })
+  const severityCards = ['critical', 'high', 'medium', 'low'].map((level) => {
+    const entry = dist[level] || { count: 0, avg_score: 0 }
+    const share = totalSessions > 0 ? (entry.count / totalSessions) * 100 : 0
+    return { level, ...entry, share, colors: riskColors[level] }
+  })
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-white">Risk Monitoring Dashboard</h2>
-          <p className="text-gray-400 text-sm mt-1">Real-time monitoring of high-risk sessions and alerts</p>
-        </div>
-        <button onClick={fetchRiskDashboard} className="px-4 py-2 bg-[#00D9D9] text-black rounded-lg hover:bg-[#00C0C0] text-sm font-medium transition-all">Refresh</button>
-      </div>
-
-      {/* Severity Distribution Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {['critical', 'high', 'medium', 'low'].map(level => {
-          const d = dist[level] || { count: 0, avg_score: 0 }
-          const colors = riskColors[level]
-          return (
-            <div key={level} className={`${colors.bg} rounded-xl p-5 border ${colors.border} backdrop-blur-sm`}>
-              <div className="flex items-center justify-between">
-                <span className={`text-sm font-semibold uppercase ${colors.text}`}>{level}</span>
-                <span className={`text-3xl font-bold ${colors.text}`}>{d.count}</span>
+    <div className="space-y-8">
+      <section className="relative overflow-hidden rounded-[32px] border border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(0,217,217,0.2),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(244,63,94,0.18),_transparent_28%),linear-gradient(135deg,_#141414_0%,_#0b0b0b_55%,_#111827_100%)] p-6 shadow-[0_40px_120px_rgba(0,0,0,0.45)] sm:p-8">
+        <div className="absolute inset-y-0 right-0 hidden w-72 bg-[radial-gradient(circle,_rgba(255,255,255,0.08),_transparent_65%)] lg:block" />
+        <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.8fr)]">
+          <div className="space-y-5">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[#8BF3F3]">
+              Live risk command center
+            </div>
+            <div>
+              <h2 className="max-w-3xl text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                Faster triage, clearer urgency, and a stronger at-a-glance monitoring view.
+              </h2>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-gray-300 sm:text-base">
+                Real-time visibility into escalation volume, high-risk sessions, and alert activity from the Buddy RAG service.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-white/10 bg-black/25 p-4 backdrop-blur-sm">
+                <p className="text-[11px] uppercase tracking-[0.24em] text-gray-500">Active flagged sessions</p>
+                <p className="mt-3 text-3xl font-bold text-white">{totalSessions || 0}</p>
+                <p className="mt-2 text-sm text-gray-400">{criticalCount + highCount} require closer review</p>
               </div>
-              <p className={`text-xs mt-1 ${colors.text} opacity-70`}>Avg Score: {d.avg_score || 0}/100</p>
-              <div className="mt-2 w-full bg-black/30 rounded-full h-2">
-                <div className={`${colors.bar} h-2 rounded-full transition-all duration-500`} style={{ width: `${Math.min((d.count / totalSessions) * 100, 100)}%` }}></div>
+              <div className="rounded-2xl border border-white/10 bg-black/25 p-4 backdrop-blur-sm">
+                <p className="text-[11px] uppercase tracking-[0.24em] text-gray-500">Highest detected score</p>
+                <p className="mt-3 text-3xl font-bold text-white">{highestCaseScore || 0}<span className="ml-1 text-base text-gray-500">/100</span></p>
+                <p className="mt-2 text-sm text-gray-400">Top urgency currently in queue</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-black/25 p-4 backdrop-blur-sm">
+                <p className="text-[11px] uppercase tracking-[0.24em] text-gray-500">Observed identities</p>
+                <p className="mt-3 text-3xl font-bold text-white">{monitoredUsers || 0}</p>
+                <p className="mt-2 text-sm text-gray-400">Unique sessions across cases and alerts</p>
               </div>
             </div>
-          )
-        })}
-      </div>
+          </div>
 
-      {/* High Risk Active Cases */}
-      <div className="bg-[#1A1A1A] rounded-xl border border-gray-800 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-800 bg-black/30">
-          <h3 className="font-semibold text-white">High-Risk Active Cases</h3>
-          <p className="text-sm text-gray-400">Sessions flagged as high or critical risk (anonymized)</p>
+          <div className="flex flex-col justify-between gap-5 rounded-[28px] border border-white/10 bg-black/30 p-5 backdrop-blur-md">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.24em] text-gray-500">Status</p>
+              <div className="mt-3 flex items-center gap-3">
+                <span className="relative flex h-3 w-3">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-400" />
+                </span>
+                <span className="text-sm font-medium text-white">Feed active and auto-refreshing every 30 seconds</span>
+              </div>
+            </div>
+            <div className="space-y-3 text-sm text-gray-300">
+              <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-white/5 px-4 py-3">
+                <span>Critical sessions</span>
+                <span className="font-semibold text-white">{criticalCount}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-white/5 px-4 py-3">
+                <span>Last alert received</span>
+                <span className="text-right font-medium text-white">{formatTimestamp(latestAlertTime)}</span>
+              </div>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <button
+                onClick={fetchRiskDashboard}
+                className="inline-flex items-center justify-center rounded-full bg-[#00D9D9] px-5 py-3 text-sm font-semibold text-black transition hover:bg-[#54ecec]"
+              >
+                Refresh snapshot
+              </button>
+              <button
+                onClick={toggleAllSessionsView}
+                className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+              >
+                {showAllSessions ? 'Hide session explorer' : 'Open session explorer'}
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="divide-y divide-gray-800">
-          {(!dashboardData?.high_risk_cases || dashboardData.high_risk_cases.length === 0) ? (
-            <div className="px-6 py-8 text-center text-gray-500">No high-risk cases at this time</div>
+      </section>
+
+      {showAllSessions && (
+        <section className="overflow-hidden rounded-[30px] border border-white/10 bg-[#121212] shadow-[0_24px_80px_rgba(0,0,0,0.32)]">
+          <div className="flex flex-col gap-4 border-b border-white/8 bg-[linear-gradient(135deg,rgba(0,217,217,0.08),rgba(255,255,255,0.02))] px-6 py-5 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.24em] text-gray-500">Deep dive</p>
+              <h3 className="mt-2 text-2xl font-semibold text-white">Session explorer</h3>
+              <p className="mt-1 text-sm text-gray-400">Inspect transcripts, session-level summaries, and per-message risk scoring.</p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <input
+                type="text"
+                value={sessionSearch}
+                onChange={(e) => setSessionSearch(e.target.value)}
+                placeholder="Search by user or session id"
+                className="min-w-[240px] rounded-full border border-white/10 bg-black/25 px-4 py-3 text-sm text-gray-200 placeholder:text-gray-500 focus:border-[#00D9D9] focus:outline-none"
+              />
+              <button
+                onClick={fetchAllRiskSessions}
+                className="rounded-full bg-white/8 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/12"
+              >
+                Reload sessions
+              </button>
+            </div>
+          </div>
+
+          {allSessionsLoading ? (
+            <div className="px-6 py-12 text-center text-gray-400">Loading all user sessions...</div>
+          ) : allSessionsError ? (
+            <div className="px-6 py-12 text-center text-rose-300">{allSessionsError}</div>
+          ) : filteredSessions.length === 0 ? (
+            <div className="px-6 py-12 text-center text-gray-500">No sessions found for this search.</div>
           ) : (
-            dashboardData.high_risk_cases.map((c, i) => (
-              <div key={i} className="px-6 py-4 flex items-center justify-between hover:bg-gray-800/30 transition-colors">
-                <div className="flex items-center space-x-4">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white ${c.risk_level === 'critical' ? 'bg-red-500' : 'bg-orange-500'}`}>
-                    {c.risk_score}
-                  </div>
-                  <div>
-                    <p className="font-medium text-white">
-                      {c.display_name || c.user_name || c.anonymous_id}
-                      {c.user_name && <span className="ml-2 text-xs text-gray-500 font-normal">({c.anonymous_id})</span>}
-                    </p>
-                    <p className="text-sm text-gray-400 max-w-md truncate">{c.risk_summary}</p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium border ${riskColors[c.risk_level]?.bg} ${riskColors[c.risk_level]?.text} ${riskColors[c.risk_level]?.border}`}>
-                    {c.risk_level}
-                  </span>
-                  <span className="text-xs text-gray-500">{c.interaction_count} msgs</span>
-                  {c.mood_trend && c.mood_trend.length > 1 && (
-                    <div className="flex items-end space-x-0.5 h-6">
-                      {c.mood_trend.slice(-8).map((s, j) => (
-                        <div key={j} className={`w-1.5 rounded-t ${s > 60 ? 'bg-red-400' : s > 30 ? 'bg-yellow-400' : 'bg-green-400'}`} style={{ height: `${Math.max(s / 100 * 24, 2)}px` }}></div>
-                      ))}
+            <div className="max-h-[44rem] space-y-4 overflow-y-auto p-4 sm:p-5">
+              {filteredSessions.map((session) => {
+                const sessionColors = riskColors[session.risk_level] || riskColors.low
+                const isExpanded = expandedSessionId === session.session_id
+                return (
+                  <article
+                    key={session.session_id || session.anonymous_id}
+                    className="overflow-hidden rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.015))]"
+                  >
+                    <div className="flex flex-col gap-4 px-5 py-5 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="text-lg font-semibold text-white">{getSessionLabel(session)}</h4>
+                          {session.user_name && (
+                            <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-gray-400">
+                              {session.anonymous_id}
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-2 text-xs uppercase tracking-[0.18em] text-gray-500">Session ID: {session.session_id || 'Unavailable'}</p>
+                        <p className="mt-3 text-sm leading-6 text-gray-300">{session.risk_summary || 'No summary available.'}</p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                        <span className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${sessionColors.soft}`}>
+                          {session.risk_level || 'low'}
+                        </span>
+                        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-gray-200">
+                          {session.risk_score || 0}/100
+                        </span>
+                        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-gray-400">
+                          {session.interaction_count || 0} msgs
+                        </span>
+                        <button
+                          onClick={() => setExpandedSessionId(isExpanded ? null : session.session_id)}
+                          className="rounded-full border border-[#00D9D9]/30 bg-[#00D9D9]/8 px-4 py-2 text-xs font-semibold text-[#8BF3F3] transition hover:bg-[#00D9D9]/14"
+                        >
+                          {isExpanded ? 'Hide transcript' : 'View transcript'}
+                        </button>
+                      </div>
                     </div>
-                  )}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
 
-      {/* Recent Alerts */}
-      <div className="bg-[#1A1A1A] rounded-xl border border-gray-800 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-800 bg-black/30">
-          <h3 className="font-semibold text-white">Recent Risk Alerts</h3>
-        </div>
-        <div className="divide-y divide-gray-800 max-h-96 overflow-y-auto">
-          {(!dashboardData?.recent_alerts || dashboardData.recent_alerts.length === 0) ? (
-            <div className="px-6 py-8 text-center text-gray-500">No recent alerts</div>
-          ) : (
-            dashboardData.recent_alerts.map((a, i) => (
-              <div key={i} className="px-6 py-3 flex items-center justify-between hover:bg-gray-800/30 transition-colors">
-                <div className="flex items-center space-x-3">
-                  <span className={`w-2 h-2 rounded-full ${riskColors[a.risk_level]?.bar}`}></span>
-                  <span className="text-sm text-gray-300 max-w-lg truncate">{a.risk_summary}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className={`px-2 py-0.5 rounded text-xs border ${riskColors[a.risk_level]?.bg} ${riskColors[a.risk_level]?.text} ${riskColors[a.risk_level]?.border}`}>
-                    {a.risk_score}/100
-                  </span>
-                  <span className="text-xs text-gray-500">
-                    {a.created_at ? new Date(a.created_at).toLocaleString() : ''}
-                  </span>
-                </div>
+                    {isExpanded && (
+                      <div className="border-t border-white/8 bg-black/25 px-5 py-4">
+                        {!session.messages || session.messages.length === 0 ? (
+                          <div className="rounded-2xl border border-dashed border-white/10 px-4 py-8 text-center text-sm text-gray-500">
+                            No chat history available.
+                          </div>
+                        ) : (
+                          <div className="max-h-80 space-y-3 overflow-y-auto pr-1">
+                            {session.messages.map((message, idx) => (
+                              <div
+                                key={`${session.session_id}-msg-${idx}`}
+                                className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3"
+                              >
+                                <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                  <span className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${message.role === 'user' ? 'text-gray-300' : 'text-[#8BF3F3]'}`}>
+                                    {message.role}
+                                  </span>
+                                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
+                                    <span>Score: {typeof message.risk_score === 'number' ? `${message.risk_score}/100` : 'N/A'}</span>
+                                    <span>{formatTimestamp(message.timestamp)}</span>
+                                  </div>
+                                </div>
+                                <p className="whitespace-pre-wrap text-sm leading-6 text-gray-200">{message.content}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </article>
+                )
+              })}
+            </div>
+          )}
+        </section>
+      )}
+
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {severityCards.map(({ level, count, avg_score, share, colors }) => (
+          <article
+            key={level}
+            className={`group overflow-hidden rounded-[26px] border p-5 shadow-[0_20px_60px_rgba(0,0,0,0.24)] transition duration-300 hover:-translate-y-1 ${colors.shell} ${colors.ring} ring-1`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className={`text-xs font-semibold uppercase tracking-[0.24em] ${colors.text}`}>{level}</p>
+                <p className="mt-3 text-4xl font-bold text-white">{count || 0}</p>
               </div>
-            ))
+              <div className="rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-right">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">Average</p>
+                <p className={`mt-1 text-lg font-semibold ${colors.text}`}>{avg_score || 0}<span className="text-sm text-gray-500">/100</span></p>
+              </div>
+            </div>
+            <div className="mt-5">
+              <div className="mb-2 flex items-center justify-between text-xs text-gray-400">
+                <span>Share of flagged sessions</span>
+                <span>{share.toFixed(0)}%</span>
+              </div>
+              <div className="h-2.5 rounded-full bg-black/35">
+                <div className={`h-2.5 rounded-full transition-all duration-700 ${colors.accent}`} style={{ width: `${Math.min(share, 100)}%` }} />
+              </div>
+            </div>
+          </article>
+        ))}
+      </section>
+
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.9fr)]">
+        <div className="overflow-hidden rounded-[30px] border border-white/10 bg-[#121212] shadow-[0_24px_80px_rgba(0,0,0,0.32)]">
+          <div className="flex flex-col gap-3 border-b border-white/8 bg-[linear-gradient(135deg,rgba(255,255,255,0.04),rgba(255,255,255,0))] px-6 py-5 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.24em] text-gray-500">Priority review</p>
+              <h3 className="mt-2 text-2xl font-semibold text-white">High-risk active cases</h3>
+              <p className="mt-1 text-sm text-gray-400">Focused queue for high and critical sessions with immediate context.</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-gray-300">
+              {highRiskCases.length || 0} cases in active watchlist
+            </div>
+          </div>
+
+          {highRiskCases.length === 0 ? (
+            <div className="px-6 py-14 text-center text-gray-500">No high-risk cases at this time.</div>
+          ) : (
+            <div className="grid gap-4 p-4 sm:p-5">
+              {highRiskCases.map((caseItem, index) => {
+                const caseColors = riskColors[caseItem.risk_level] || riskColors.low
+                return (
+                  <article
+                    key={`${caseItem.session_id || caseItem.anonymous_id || 'case'}-${index}`}
+                    className="rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] p-5 transition hover:border-white/15 hover:bg-white/[0.045]"
+                  >
+                    <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="flex min-w-0 gap-4">
+                        <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/10 text-lg font-bold text-white ${caseColors.accent}`}>
+                          {caseItem.risk_score || 0}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="text-lg font-semibold text-white">{getSessionLabel(caseItem)}</h4>
+                            {caseItem.user_name && (
+                              <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-gray-400">
+                                {caseItem.anonymous_id}
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-2 text-sm leading-6 text-gray-300">{caseItem.risk_summary || 'No risk summary available.'}</p>
+                          <div className="mt-4 flex flex-wrap gap-2 text-xs">
+                            <span className={`rounded-full border px-3 py-1 font-semibold uppercase tracking-[0.18em] ${caseColors.soft}`}>
+                              {caseItem.risk_level || 'low'}
+                            </span>
+                            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-gray-300">
+                              {caseItem.interaction_count || 0} messages
+                            </span>
+                            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-gray-300">
+                              Score {caseItem.risk_score || 0}/100
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {caseItem.mood_trend && caseItem.mood_trend.length > 1 && (
+                        <div className="w-full rounded-2xl border border-white/8 bg-black/20 p-4 lg:w-44">
+                          <p className="text-[11px] uppercase tracking-[0.22em] text-gray-500">Mood trend</p>
+                          <div className="mt-4 flex h-16 items-end gap-1">
+                            {caseItem.mood_trend.slice(-8).map((score, trendIndex) => (
+                              <div
+                                key={`${caseItem.session_id || index}-trend-${trendIndex}`}
+                                className={`flex-1 rounded-t-md ${score > 60 ? 'bg-rose-400' : score > 30 ? 'bg-amber-400' : 'bg-emerald-400'}`}
+                                style={{ height: `${Math.max((score / 100) * 64, 6)}px` }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
           )}
         </div>
-      </div>
+
+        <div className="overflow-hidden rounded-[30px] border border-white/10 bg-[#121212] shadow-[0_24px_80px_rgba(0,0,0,0.32)]">
+          <div className="border-b border-white/8 bg-[linear-gradient(135deg,rgba(255,255,255,0.04),rgba(255,255,255,0))] px-6 py-5">
+            <p className="text-[11px] uppercase tracking-[0.24em] text-gray-500">Alert stream</p>
+            <h3 className="mt-2 text-2xl font-semibold text-white">Recent risk alerts</h3>
+            <p className="mt-1 text-sm text-gray-400">Latest alert activity with score, urgency, and arrival time.</p>
+          </div>
+          <div className="max-h-[44rem] overflow-y-auto p-4">
+            {recentAlerts.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-white/10 px-6 py-14 text-center text-gray-500">No recent alerts.</div>
+            ) : (
+              <div className="space-y-3">
+                {recentAlerts.map((alert, index) => {
+                  const alertColors = riskColors[alert.risk_level] || riskColors.low
+                  return (
+                    <article
+                      key={`${alert.session_id || alert.created_at || 'alert'}-${index}`}
+                      className="rounded-[22px] border border-white/8 bg-white/[0.03] p-4 transition hover:border-white/15 hover:bg-white/[0.05]"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 gap-3">
+                          <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${alertColors.accent}`} />
+                          <div className="min-w-0">
+                            <p className="text-sm leading-6 text-gray-200">{alert.risk_summary || 'No alert summary available.'}</p>
+                            <p className="mt-2 text-xs text-gray-500">{formatTimestamp(alert.created_at)}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${alertColors.soft}`}>
+                            {alert.risk_score || 0}/100
+                          </span>
+                          <p className={`mt-2 text-[11px] font-semibold uppercase tracking-[0.18em] ${alertColors.text}`}>
+                            {alert.risk_level || 'low'}
+                          </p>
+                        </div>
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
     </div>
   )
 }
@@ -1570,174 +1922,392 @@ const PeerApprovalTab = () => {
   )
 }
 
-// Student Analytics Tab Component (No changes needed, already uses local state)
-const StudentAnalyticsTab = () => {
-  const [analyticsData] = useState({
+const StudentAnalyticsTab = ({ callApi }) => {
+  const [period, setPeriod] = useState('30')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [lastUpdated, setLastUpdated] = useState(null)
+  const [analyticsData, setAnalyticsData] = useState({
     overview: {
-      totalStudents: 2847,
-      activeStudents: 1923,
-      newRegistrations: 156,
-      engagementRate: 78.5
+      totalStudents: 0,
+      activeStudents: 0,
+      totalScreenings: 0,
+      screeningCompletionRate: 0
     },
-    mentalHealthLevels: [
-      { level: 'Excellent', count: 852, percentage: 30, color: 'bg-green-500' },
-      { level: 'Good', count: 1138, percentage: 40, color: 'bg-orange-500' },
-      { level: 'Fair', count: 569, percentage: 20, color: 'bg-red-400' },
-      { level: 'Poor', count: 284, percentage: 10, color: 'bg-red-600' }
-    ],
-    courseEngagement: [
-      { course: 'Stress Management', enrolled: 456, completed: 324, completion: 71 },
-      { course: 'Mindfulness Basics', enrolled: 389, completed: 298, completion: 77 },
-      { course: 'Anxiety Coping', enrolled: 234, completed: 167, completion: 71 },
-      { course: 'Study Skills', enrolled: 345, completed: 289, completion: 84 }
-    ],
-    peerTalkStats: {
-      totalSessions: 1247,
-      activePeers: 23,
-      avgSessionDuration: 45,
-      satisfactionRate: 92
-    }
+    registrationTrend: [],
+    roleDistribution: [],
+    riskDistribution: [],
+    collegeDistribution: [],
+    crisisAlerts: 0
   })
 
+  const roleColors = ['#00D9D9', '#22C55E', '#F59E0B', '#EF4444', '#8B5CF6']
+
+  useEffect(() => {
+    fetchStudentAnalytics()
+  }, [period])
+
+  const fetchStudentAnalytics = async () => {
+    if (!callApi) {
+      setError('API service is unavailable for analytics')
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const [overviewResult, userAnalyticsResult] = await Promise.all([
+        callApi('/api/v1/admin/overview', 'GET'),
+        callApi(`/api/v1/admin/users/analytics?period=${period}`, 'GET')
+      ])
+
+      if (!overviewResult.success && !userAnalyticsResult.success) {
+        setError('Unable to fetch student analytics at this time')
+        return
+      }
+
+      const overviewData = overviewResult.success ? overviewResult.data : {}
+      const userAnalytics = userAnalyticsResult.success ? userAnalyticsResult.data : {}
+
+      const studentRole = (userAnalytics.roleDistribution || []).find((role) => role._id === 'student') || {
+        count: 0,
+        activeCount: 0
+      }
+
+      const registrationByDate = (userAnalytics.registrationTrends || [])
+        .filter((item) => item?._id?.role === 'student')
+        .reduce((acc, item) => {
+          const date = item?._id?.date
+          if (!date) return acc
+          acc[date] = (acc[date] || 0) + (item.count || 0)
+          return acc
+        }, {})
+
+      const registrationTrend = Object.entries(registrationByDate)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, count]) => ({
+          date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          registrations: count
+        }))
+
+      const roleDistribution = (userAnalytics.roleDistribution || []).map((item) => ({
+        name: (item._id || 'unknown').replace('_', ' '),
+        value: item.count || 0,
+        active: item.activeCount || 0
+      }))
+
+      const riskDistribution = (overviewData.analytics?.screeningsByRisk || []).map((item) => ({
+        level: (item.riskLevel || 'unknown').replace('_', ' '),
+        count: item.count || 0,
+        percentage: item.percentage || 0,
+        avgPHQ9: item.avgPHQ9Score || 0,
+        avgGAD7: item.avgGAD7Score || 0
+      }))
+
+      const collegeDistribution = (userAnalytics.collegeDistribution || [])
+        .filter((item) => (item.studentCount || 0) > 0)
+        .slice(0, 10)
+        .map((item) => ({
+          college: item._id || 'Unassigned',
+          students: item.studentCount || 0,
+          counsellors: item.counsellorCount || 0
+        }))
+
+      setAnalyticsData({
+        overview: {
+          totalStudents: studentRole.count || 0,
+          activeStudents: studentRole.activeCount || 0,
+          totalScreenings: overviewData.overview?.totalScreenings || 0,
+          screeningCompletionRate: Number(overviewData.systemHealth?.userEngagement?.screeningCompletionRate || 0)
+        },
+        registrationTrend,
+        roleDistribution,
+        riskDistribution,
+        collegeDistribution,
+        crisisAlerts: overviewData.overview?.crisisAlerts || 0
+      })
+      setLastUpdated(new Date())
+    } catch (err) {
+      setError(err.message || 'Failed to load student analytics')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="rounded-[28px] border border-white/10 bg-[#111111] px-8 py-14 text-center shadow-[0_30px_80px_rgba(0,0,0,0.35)]">
+        <div className="mx-auto h-12 w-12 animate-spin rounded-full border-2 border-white/10 border-t-[#00D9D9]"></div>
+        <p className="mt-4 text-sm text-gray-400">Loading student analytics...</p>
+      </div>
+    )
+  }
+
+  const activeStudentRate = analyticsData.overview.totalStudents > 0
+    ? (analyticsData.overview.activeStudents / analyticsData.overview.totalStudents) * 100
+    : 0
+
+  const dominantRisk = analyticsData.riskDistribution.reduce((top, item) => {
+    if (!top || item.count > top.count) return item
+    return top
+  }, null)
+
+  const topCollege = analyticsData.collegeDistribution[0]
+
+  const overviewCards = [
+    {
+      label: 'Total students',
+      value: analyticsData.overview.totalStudents.toLocaleString(),
+      note: `${activeStudentRate.toFixed(1)}% currently active`,
+      accent: 'from-cyan-400/30 via-cyan-400/10 to-transparent',
+      valueClass: 'text-white'
+    },
+    {
+      label: 'Active students',
+      value: analyticsData.overview.activeStudents.toLocaleString(),
+      note: `${Math.max(analyticsData.overview.totalStudents - analyticsData.overview.activeStudents, 0).toLocaleString()} inactive`,
+      accent: 'from-emerald-400/30 via-emerald-400/10 to-transparent',
+      valueClass: 'text-emerald-300'
+    },
+    {
+      label: 'Completed screenings',
+      value: analyticsData.overview.totalScreenings.toLocaleString(),
+      note: dominantRisk ? `Largest segment: ${dominantRisk.level}` : 'Awaiting screening segmentation',
+      accent: 'from-sky-400/30 via-sky-400/10 to-transparent',
+      valueClass: 'text-[#8BF3F3]'
+    },
+    {
+      label: 'Completion rate',
+      value: `${analyticsData.overview.screeningCompletionRate.toFixed(1)}%`,
+      note: `${analyticsData.crisisAlerts} crisis alerts in overview`,
+      accent: 'from-amber-400/30 via-amber-400/10 to-transparent',
+      valueClass: 'text-amber-300'
+    }
+  ]
+
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-white">Student Analytics</h2>
-          <p className="text-gray-400 mt-1">Comprehensive insights into student engagement and mental health</p>
-        </div>
-      </div>
+    <div className="space-y-8">
+      <section className="relative overflow-hidden rounded-[32px] border border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(0,217,217,0.18),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,0.14),_transparent_26%),linear-gradient(135deg,_#131313_0%,_#0c1220_55%,_#101926_100%)] p-6 shadow-[0_40px_120px_rgba(0,0,0,0.42)] sm:p-8">
+        <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+          <div className="max-w-3xl">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[#8BF3F3]">
+              Student intelligence
+            </div>
+            <h2 className="mt-4 text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              Cleaner student insights with faster scanning across growth, engagement, and risk.
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-gray-300 sm:text-base">
+              A sharper analytics surface for registration patterns, screening coverage, mental health distribution, and college-level visibility.
+            </p>
+            {lastUpdated && (
+              <p className="mt-4 text-xs uppercase tracking-[0.18em] text-gray-500">Updated {lastUpdated.toLocaleString()}</p>
+            )}
+          </div>
 
-      {/* Overview Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-[#1A1A1A] p-6 rounded-xl border border-gray-800">
-          <div className="flex items-center">
-            <div className="p-3 rounded-lg bg-blue-900/30 border border-blue-800">
-              <span className="text-sm font-bold text-blue-400">TU</span>
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-400">Total Students</p>
-              <p className="text-2xl font-bold text-white">{analyticsData.overview.totalStudents.toLocaleString()}</p>
-            </div>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <select
+              value={period}
+              onChange={(e) => setPeriod(e.target.value)}
+              className="rounded-full border border-white/10 bg-black/25 px-4 py-3 text-sm text-gray-200 focus:border-[#00D9D9] focus:outline-none"
+            >
+              <option value="7">Last 7 days</option>
+              <option value="30">Last 30 days</option>
+              <option value="90">Last 90 days</option>
+              <option value="180">Last 180 days</option>
+            </select>
+            <button
+              onClick={fetchStudentAnalytics}
+              className="rounded-full bg-[#00D9D9] px-5 py-3 text-sm font-semibold text-black transition hover:bg-[#54ecec]"
+            >
+              Refresh analytics
+            </button>
           </div>
         </div>
-        <div className="bg-[#1A1A1A] p-6 rounded-xl border border-gray-800">
-          <div className="flex items-center">
-            <div className="p-3 rounded-lg bg-green-900/30 border border-green-800">
-              <span className="text-sm font-bold text-green-400">AS</span>
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-400">Active Students</p>
-              <p className="text-2xl font-bold text-white">{analyticsData.overview.activeStudents.toLocaleString()}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-[#1A1A1A] p-6 rounded-xl border border-gray-800">
-          <div className="flex items-center">
-            <div className="p-3 rounded-lg bg-purple-900/30 border border-purple-800">
-              <span className="text-sm font-bold text-purple-400">NR</span>
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-400">New This Month</p>
-              <p className="text-2xl font-bold text-white">{analyticsData.overview.newRegistrations}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-[#1A1A1A] p-6 rounded-xl border border-gray-800">
-          <div className="flex items-center">
-            <div className="p-3 rounded-lg bg-yellow-900/30 border border-yellow-800">
-              <span className="text-sm font-bold text-yellow-400">ER</span>
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-400">Engagement Rate</p>
-              <p className="text-2xl font-bold text-white">{analyticsData.overview.engagementRate}%</p>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      {/* Mental Health Levels Distribution */}
-      <div className="bg-[#1A1A1A] rounded-xl border border-gray-800 p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">Mental Health Levels Distribution</h3>
-        <div className="space-y-4">
-          {analyticsData.mentalHealthLevels.map((level, index) => (
-            <div key={index} className="flex items-center">
-              <div className="w-24 text-sm font-medium text-gray-300">{level.level}</div>
-              <div className="flex-1 mx-4">
-                <div className="bg-gray-800 rounded-full h-4">
-                  <div 
-                    className={`h-4 rounded-full ${level.color} transition-all duration-500`}
-                    style={{ width: `${level.percentage}%` }}
-                  ></div>
+        <div className="relative mt-6 grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(280px,0.7fr)]">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {overviewCards.map((card) => (
+              <article
+                key={card.label}
+                className={`overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 shadow-[0_18px_55px_rgba(0,0,0,0.24)]`}
+              >
+                <div className={`-mx-5 -mt-5 h-1 bg-gradient-to-r ${card.accent}`}></div>
+                <p className="mt-4 text-[11px] uppercase tracking-[0.22em] text-gray-500">{card.label}</p>
+                <p className={`mt-3 text-3xl font-bold ${card.valueClass}`}>{card.value}</p>
+                <p className="mt-3 text-sm text-gray-400">{card.note}</p>
+              </article>
+            ))}
+          </div>
+
+          <aside className="rounded-[26px] border border-white/10 bg-black/25 p-5 backdrop-blur-sm">
+            <p className="text-[11px] uppercase tracking-[0.22em] text-gray-500">Snapshot</p>
+            <div className="mt-4 space-y-4">
+              <div>
+                <div className="mb-2 flex items-center justify-between text-sm text-gray-400">
+                  <span>Active participation</span>
+                  <span>{activeStudentRate.toFixed(1)}%</span>
+                </div>
+                <div className="h-2.5 rounded-full bg-white/8">
+                  <div className="h-2.5 rounded-full bg-gradient-to-r from-[#00D9D9] to-emerald-400" style={{ width: `${Math.min(activeStudentRate, 100)}%` }}></div>
                 </div>
               </div>
-              <div className="w-28 text-sm text-gray-400 text-right">
-                {level.count} ({level.percentage}%)
+              <div className="rounded-2xl border border-white/8 bg-white/5 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">Dominant risk tier</p>
+                <p className="mt-2 text-lg font-semibold text-white capitalize">{dominantRisk?.level || 'Unavailable'}</p>
+                <p className="mt-1 text-sm text-gray-400">{dominantRisk ? `${dominantRisk.count} screenings` : 'No screening data yet'}</p>
+              </div>
+              <div className="rounded-2xl border border-white/8 bg-white/5 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">Top college footprint</p>
+                <p className="mt-2 text-lg font-semibold text-white">{topCollege?.college || 'Unassigned'}</p>
+                <p className="mt-1 text-sm text-gray-400">
+                  {topCollege ? `${topCollege.students} students, ${topCollege.counsellors} counsellors` : 'No college breakdown available'}
+                </p>
               </div>
             </div>
-          ))}
+          </aside>
+        </div>
+      </section>
+
+      {error && (
+        <div className="rounded-[24px] border border-rose-500/25 bg-rose-500/10 p-4 text-sm text-rose-200">
+          {error}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div className="overflow-hidden rounded-[28px] border border-white/10 bg-[#121212] shadow-[0_24px_80px_rgba(0,0,0,0.3)]">
+          <div className="border-b border-white/8 bg-[linear-gradient(135deg,rgba(255,255,255,0.04),rgba(255,255,255,0))] px-6 py-5">
+            <p className="text-[11px] uppercase tracking-[0.22em] text-gray-500">Growth trend</p>
+            <h3 className="mt-2 text-xl font-semibold text-white">Student registration trend</h3>
+            <p className="mt-1 text-sm text-gray-400">New student registrations over the selected reporting window.</p>
+          </div>
+          <div className="p-6">
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={analyticsData.registrationTrend}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis dataKey="date" stroke="#9CA3AF" />
+                <YAxis stroke="#9CA3AF" />
+                <Tooltip contentStyle={{ backgroundColor: '#111827', border: '1px solid #374151' }} />
+                <Legend />
+                <Line
+                  type="monotone"
+                  dataKey="registrations"
+                  stroke="#00D9D9"
+                  strokeWidth={3}
+                  dot={{ r: 3, fill: '#00D9D9' }}
+                  name="Registrations"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+        </div>
+
+        <div className="overflow-hidden rounded-[28px] border border-white/10 bg-[#121212] shadow-[0_24px_80px_rgba(0,0,0,0.3)]">
+          <div className="border-b border-white/8 bg-[linear-gradient(135deg,rgba(255,255,255,0.04),rgba(255,255,255,0))] px-6 py-5">
+            <p className="text-[11px] uppercase tracking-[0.22em] text-gray-500">Population mix</p>
+            <h3 className="mt-2 text-xl font-semibold text-white">User role distribution</h3>
+            <p className="mt-1 text-sm text-gray-400">Relative share of students, counsellors, and other user roles.</p>
+          </div>
+          <div className="p-6">
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={analyticsData.roleDistribution}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={95}
+                  label
+                >
+                  {analyticsData.roleDistribution.map((entry, index) => (
+                    <Cell key={`${entry.name}-${index}`} fill={roleColors[index % roleColors.length]} />
+                  ))}
+                </Pie>
+                <Tooltip contentStyle={{ backgroundColor: '#111827', border: '1px solid #374151' }} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
         </div>
       </div>
 
-      {/* Course Engagement */}
-      <div className="bg-[#1A1A1A] rounded-xl border border-gray-800 overflow-hidden">
-        <div className="p-6 border-b border-gray-800 bg-black/30">
-          <h3 className="text-lg font-semibold text-white">Course Engagement</h3>
+      <div className="overflow-hidden rounded-[28px] border border-white/10 bg-[#121212] shadow-[0_24px_80px_rgba(0,0,0,0.3)]">
+        <div className="border-b border-white/8 bg-[linear-gradient(135deg,rgba(255,255,255,0.04),rgba(255,255,255,0))] px-6 py-5">
+          <p className="text-[11px] uppercase tracking-[0.22em] text-gray-500">Wellbeing distribution</p>
+          <h3 className="mt-2 text-xl font-semibold text-white">Mental health risk distribution</h3>
+          <p className="mt-1 text-sm text-gray-400">Completed screening breakdown with PHQ-9 and GAD-7 context.</p>
+        </div>
+        <div className="space-y-4 p-6">
+          {analyticsData.riskDistribution.length === 0 ? (
+            <p className="text-gray-500 text-sm">No screening distribution data available.</p>
+          ) : (
+            analyticsData.riskDistribution.map((item) => (
+              <div key={item.level} className="rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <span className="text-sm font-semibold capitalize text-white">{item.level}</span>
+                    <p className="mt-1 text-sm text-gray-400">
+                      {item.count} screenings with PHQ-9 avg {item.avgPHQ9} and GAD-7 avg {item.avgGAD7}
+                    </p>
+                  </div>
+                  <span className="text-sm font-medium text-gray-300">
+                    {item.percentage}%
+                  </span>
+                </div>
+                <div className="mt-4 h-3 rounded-full bg-white/8">
+                  <div className="h-3 rounded-full bg-gradient-to-r from-[#00D9D9] via-sky-400 to-emerald-400" style={{ width: `${item.percentage}%` }}></div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-[28px] border border-white/10 bg-[#121212] shadow-[0_24px_80px_rgba(0,0,0,0.3)]">
+        <div className="px-6 py-5 border-b border-white/8 bg-[linear-gradient(135deg,rgba(255,255,255,0.04),rgba(255,255,255,0))]">
+          <p className="text-[11px] uppercase tracking-[0.22em] text-gray-500">College map</p>
+          <h3 className="mt-2 text-xl font-semibold text-white">Top colleges by student count</h3>
+          <p className="mt-1 text-sm text-gray-400">Largest student cohorts and support coverage by counsellor count.</p>
         </div>
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-800">
-            <thead className="bg-black/30">
+          <table className="min-w-full divide-y divide-white/8">
+            <thead className="bg-white/[0.03]">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Course</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Enrolled</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Completed</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Completion Rate</th>
+                <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-[0.2em] text-gray-500">College ID</th>
+                <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-[0.2em] text-gray-500">Students</th>
+                <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-[0.2em] text-gray-500">Counsellors</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800">
-              {analyticsData.courseEngagement.map((course, index) => (
-                <tr key={index} className="hover:bg-gray-800/30 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">{course.course}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{course.enrolled}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{course.completed}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="flex-1 bg-gray-800 rounded-full h-2 mr-3">
-                        <div 
-                          className="bg-[#00D9D9] h-2 rounded-full transition-all duration-500" 
-                          style={{width: `${course.completion}%`}}
-                        ></div>
-                      </div>
-                      <span className="text-sm text-white w-12">{course.completion}%</span>
-                    </div>
-                  </td>
+            <tbody className="divide-y divide-white/8">
+              {analyticsData.collegeDistribution.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="px-6 py-6 text-center text-sm text-gray-500">No college distribution data available.</td>
                 </tr>
-              ))}
+              ) : (
+                analyticsData.collegeDistribution.map((college, index) => (
+                  <tr key={college.college} className="transition-colors hover:bg-white/[0.03]">
+                    <td className="px-6 py-4 text-sm text-white">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-xs font-semibold text-gray-300">
+                          {index + 1}
+                        </span>
+                        <span>{college.college}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-sm font-semibold text-[#8BF3F3]">{college.students}</td>
+                    <td className="px-6 py-4 text-sm text-gray-300">{college.counsellors}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
-        </div>
-      </div>
-
-      {/* Peer Talk Statistics */}
-      <div className="bg-[#1A1A1A] rounded-xl border border-gray-800 p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">Peer Talk Statistics</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          <div className="text-center p-4 rounded-lg bg-black/30 border border-gray-800">
-            <p className="text-3xl font-bold text-[#00D9D9]">{analyticsData.peerTalkStats.totalSessions}</p>
-            <p className="text-sm text-gray-400 mt-1">Total Sessions</p>
-          </div>
-          <div className="text-center p-4 rounded-lg bg-black/30 border border-gray-800">
-            <p className="text-3xl font-bold text-green-400">{analyticsData.peerTalkStats.activePeers}</p>
-            <p className="text-sm text-gray-400 mt-1">Active Peers</p>
-          </div>
-          <div className="text-center p-4 rounded-lg bg-black/30 border border-gray-800">
-            <p className="text-3xl font-bold text-purple-400">{analyticsData.peerTalkStats.avgSessionDuration}m</p>
-            <p className="text-sm text-gray-400 mt-1">Avg Session Duration</p>
-          </div>
-          <div className="text-center p-4 rounded-lg bg-black/30 border border-gray-800">
-            <p className="text-3xl font-bold text-orange-400">{analyticsData.peerTalkStats.satisfactionRate}%</p>
-            <p className="text-sm text-gray-400 mt-1">Satisfaction Rate</p>
-          </div>
         </div>
       </div>
     </div>

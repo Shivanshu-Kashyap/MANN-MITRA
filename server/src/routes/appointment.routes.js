@@ -5,6 +5,7 @@ const {
   getMyAppointments,
   getAppointment,
   updateAppointmentStatus,
+  extendAppointmentSession,
   getCounsellorAvailability
 } = require('../controllers/appointment.controller');
 const { protect, authorize } = require('../middlewares/auth.middleware');
@@ -48,8 +49,8 @@ const appointmentValidation = [
       return true;
     }),
   body('mode')
-    .isIn(['in-person', 'tele'])
-    .withMessage('Mode must be either in-person or tele'),
+    .isIn(['in-person', 'tele', 'chat', 'video'])
+    .withMessage('Mode must be in-person, tele, chat, or video'),
   body('reason')
     .optional()
     .isLength({ max: 500 })
@@ -141,6 +142,22 @@ const availabilityValidation = [
     })
 ];
 
+const extendSessionValidation = [
+  param('id')
+    .isMongoId()
+    .withMessage('Appointment ID must be a valid MongoDB ObjectId'),
+  body('additionalMinutes')
+    .isInt({ min: 5, max: 120 })
+    .withMessage('additionalMinutes must be between 5 and 120')
+    .custom((value) => {
+      const allowed = [5, 10, 15, 20, 30, 45, 60, 90, 120];
+      if (!allowed.includes(value)) {
+        throw new Error('Extension must be one of: 5, 10, 15, 20, 30, 45, 60, 90, or 120 minutes');
+      }
+      return true;
+    })
+];
+
 // Routes
 
 // Create new appointment (students only, but allow counsellors for admin purposes)
@@ -159,6 +176,9 @@ router.get('/:id', protect, [
 
 // Update appointment status (counsellors, admins, and students for cancellation)
 router.patch('/:id/status', protect, statusUpdateValidation, updateAppointmentStatus);
+
+// Extend remote session end time (student or counsellor on the appointment)
+router.patch('/:id/extend', protect, extendSessionValidation, extendAppointmentSession);
 
 // Admin/Counsellor routes for appointment management
 

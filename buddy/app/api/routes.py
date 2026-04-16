@@ -319,6 +319,62 @@ async def get_alerts(limit: int = Query(default=50, ge=1, le=200)):
     return {"success": True, "alerts": alerts, "count": len(alerts)}
 
 
+@router.get("/admin/risk-sessions")
+async def get_risk_sessions(
+    limit: int = Query(default=200, ge=1, le=1000),
+    include_messages: bool = Query(default=True),
+):
+    """Return all chat sessions for admin review with optional full transcript."""
+    sessions = await session_store.get_admin_sessions(
+        limit=limit,
+        include_messages=include_messages,
+    )
+
+    normalized_sessions = []
+    for s in sessions:
+        session_id = s.get("session_id", "")
+        stored_name = s.get("user_name") or None
+        anon_id = f"ANON-{session_id[:8].upper()}" if session_id else "ANON-UNKNOWN"
+        display = stored_name if stored_name else anon_id
+
+        messages = []
+        if include_messages:
+            for m in s.get("messages", []):
+                messages.append(
+                    {
+                        "role": m.get("role", "assistant"),
+                        "content": m.get("content", ""),
+                        "risk_score": m.get("risk_score", 0),
+                        "timestamp": m.get("timestamp"),
+                    }
+                )
+
+        normalized_sessions.append(
+            {
+                "session_id": session_id,
+                "anonymous_id": anon_id,
+                "user_id": s.get("user_id"),
+                "user_name": stored_name,
+                "display_name": display,
+                "risk_level": s.get("risk_level", "low"),
+                "risk_score": s.get("risk_score", 0),
+                "risk_summary": s.get("risk_summary", ""),
+                "interaction_count": s.get("interaction_count", 0),
+                "mood_scores": s.get("mood_scores", []),
+                "created_at": s.get("created_at"),
+                "updated_at": s.get("updated_at"),
+                "messages": messages,
+            }
+        )
+
+    return {
+        "success": True,
+        "count": len(normalized_sessions),
+        "sessions": normalized_sessions,
+        "generated_at": datetime.utcnow().isoformat(),
+    }
+
+
 # ━━━━━━━━━━━━━━━━━━━━ Node.js Server Integration ━━━━━━━━━━━━━━━━━━━━
 
 async def _send_alert_to_node_server(alert: AdminAlert):

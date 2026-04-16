@@ -386,8 +386,8 @@ const updateAppointmentStatus = async (req, res, next) => {
         case 'confirmed':
           await appointment.confirm(req.user.id);
           
-          // Update meeting details for tele appointments
-          if (appointment.mode === 'tele') {
+          // Update meeting details for remote (tele / chat / video) appointments
+          if (['tele', 'chat', 'video'].includes(appointment.mode)) {
             if (meetingLink) appointment.meetingLink = meetingLink.trim();
             if (meetingId) appointment.meetingId = meetingId.trim();
           }
@@ -520,10 +520,123 @@ const getCounsellorAvailability = async (req, res, next) => {
   }
 };
 
+const REMOTE_MODES = ['tele', 'chat', 'video'];
+
+// @desc    Extend scheduled session end time (during an active remote session)
+// @route   PATCH /api/v1/appointments/:id/extend
+// @access  Private (student or counsellor on the appointment)
+const extendAppointmentSession = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
+    }
+
+    const appointmentId = req.params.id;
+    const { additionalMinutes } = req.body;
+
+    const appointment = await Appointment.findById(appointmentId);
+    if (!appointment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Appointment not found'
+      });
+    }
+
+    const isStudent = appointment.studentId.toString() === req.user.id;
+    const isCounsellor = appointment.counsellorId.toString() === req.user.id;
+    if (!isStudent && !isCounsellor) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to extend this appointment'
+      });
+    }
+
+    if (!['requested', 'confirmed'].includes(appointment.status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'This appointment cannot be extended'
+      });
+    }
+
+    if (!REMOTE_MODES.includes(appointment.mode)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Only remote sessions can be extended'
+      });
+    }
+
+    const now = new Date();
+    const start = new Date(appointment.slotStart);
+    const end = new Date(appointment.slotEnd);
+
+    if (now < start) {
+      return res.status(400).json({
+        success: false,
+        message: 'Your session has not started yet'
+      });
+    }
+
+    if (now >= end) {
+      return res.status(400).json({
+        success: false,
+        message: 'This session has already ended'
+      });
+    }
+
+    const newEnd = new Date(end.getTime() + additionalMinutes * 60 * 1000);
+    const availabilityCheck = await Appointment.checkAvailability(
+      appointment.counsellorId.toString(),
+      start,
+      newEnd,
+      appointmentId
+    );
+
+    if (!availabilityCheck.isAvailable) {
+      return res.status(409).json({
+        success: false,
+        message: 'The counsellor is not available for that extension',
+        conflicts: availabilityCheck.conflicts?.map((c) => ({
+          id: c._id,
+          slotStart: c.slotStart,
+          slotEnd: c.slotEnd,
+          status: c.status
+        }))
+      });
+    }
+
+    appointment.slotEnd = newEnd;
+    await appointment.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Session extended by ${additionalMinutes} minutes`,
+      appointment: {
+        _id: appointment._id,
+        slotStart: appointment.slotStart,
+        slotEnd: appointment.slotEnd,
+        mode: appointment.mode,
+        status: appointment.status
+      }
+    });
+  } catch (error) {
+    console.error('Extend appointment session error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error extending session'
+    });
+  }
+};
+
 module.exports = {
   createAppointment,
   getMyAppointments,
   getAppointment,
   updateAppointmentStatus,
+  extendAppointmentSession,
   getCounsellorAvailability
 };

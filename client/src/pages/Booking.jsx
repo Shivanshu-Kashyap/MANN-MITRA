@@ -41,7 +41,6 @@ const Booking = () => {
   const [appointmentMode, setAppointmentMode] = useState('chat');
   const [appointmentReason, setAppointmentReason] = useState('');
   const [appointmentUrgency, setAppointmentUrgency] = useState('medium');
-  const [location, setLocation] = useState('');
   const [privateNotes, setPrivateNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -101,10 +100,9 @@ const Booking = () => {
         counsellorId: selectedCounsellor.id || selectedCounsellor._id,
         slotStart: startDateTime.toISOString(),
         slotEnd: endDateTime.toISOString(),
-        mode: appointmentMode === 'in-person' ? 'in-person' : 'tele',
+        mode: appointmentMode === 'video' ? 'video' : 'chat',
         reason: appointmentReason.trim() || 'General counselling session',
         urgency: appointmentUrgency,
-        location: appointmentMode === 'in-person' ? location.trim() : undefined,
         privateNotes: privateNotes.trim() || undefined
       };
 
@@ -121,7 +119,6 @@ const Booking = () => {
           mode: appointmentMode,
           reason: appointmentReason,
           urgency: appointmentUrgency,
-          location: location,
           status: apt?.status || 'pending',
           createdAt: new Date().toISOString()
         };
@@ -150,7 +147,6 @@ const Booking = () => {
     setAppointmentMode('chat');
     setAppointmentReason('');
     setAppointmentUrgency('medium');
-    setLocation('');
     setPrivateNotes('');
     setBookingSuccess(false);
     setError(null);
@@ -256,7 +252,7 @@ const Booking = () => {
             </h2>
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
               {[
-                { step: '01', title: 'Choose Session', desc: 'Select chat, video, or offline meet' },
+                { step: '01', title: 'Choose Session', desc: 'Select online chat or video call' },
                 { step: '02', title: 'Book & Confirm', desc: 'Get confirmation & session link' },
                 { step: '03', title: 'Attend Session', desc: 'Meet with certified counsellor' },
                 { step: '04', title: 'Follow-up', desc: 'Report sent to admin, further sessions if needed' }
@@ -319,7 +315,7 @@ const Booking = () => {
         )}
 
         {/* Main Content */}
-        <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-xl overflow-visible">
           {/* Back Button */}
           {step > 1 && (
             <div className="px-6 py-4 border-b border-gray-200">
@@ -376,8 +372,6 @@ const Booking = () => {
                 setAppointmentReason={setAppointmentReason}
                 appointmentUrgency={appointmentUrgency}
                 setAppointmentUrgency={setAppointmentUrgency}
-                location={location}
-                setLocation={setLocation}
                 privateNotes={privateNotes}
                 setPrivateNotes={setPrivateNotes}
                 onSubmit={handleBookingSubmit}
@@ -488,8 +482,16 @@ const DateTimeSelection = ({
   getMaxDate, 
   t 
 }) => {
+  const [durationOpen, setDurationOpen] = React.useState(false);
   const timeSlots = AVAILABLE_TIME_SLOTS;
   const isFormValid = selectedDate && selectedTime;
+
+  const durationOptions = [
+    { value: 30, label: '30 minutes' },
+    { value: 60, label: '60 minutes (Recommended)' },
+    { value: 90, label: '90 minutes' },
+  ];
+  const selectedLabel = durationOptions.find(o => o.value === selectedDuration)?.label ?? '60 minutes (Recommended)';
 
   return (
     <div className="space-y-6">
@@ -511,12 +513,13 @@ const DateTimeSelection = ({
             onChange={(e) => setSelectedDate(e.target.value)}
             min={getMinDate()}
             max={getMaxDate()}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-teal-700 focus:border-teal-700 text-lg"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-teal-700 focus:border-teal-700 text-lg pr-10"
+            style={{ colorScheme: 'light' }}
             required
           />
           <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
             <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3a4 4 0 118 0v4m-4 6v6m-4-6h8m-4-6V3m0 10h.01" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
           </div>
         </div>
@@ -554,20 +557,54 @@ const DateTimeSelection = ({
       </div>
 
       {/* Duration Selection */}
-      <div>
-        <label htmlFor="session-duration" className="block text-sm font-medium text-gray-700 mb-3">
+      <div className="relative">
+        <label className="block text-sm font-medium text-gray-700 mb-3">
           Session Duration
         </label>
-        <select
-          id="session-duration"
-          value={selectedDuration}
-          onChange={(e) => setSelectedDuration(parseInt(e.target.value))}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-teal-700 focus:border-teal-700"
+        {/* Custom dropdown trigger */}
+        <button
+          type="button"
+          onClick={() => setDurationOpen(prev => !prev)}
+          className="w-full flex items-center justify-between px-4 py-3 border border-gray-300 rounded-lg shadow-sm bg-white text-gray-900 text-base hover:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-700 focus:border-teal-700 transition-colors"
         >
-          <option value={30}>30 minutes</option>
-          <option value={60}>60 minutes (Recommended)</option>
-          <option value={90}>90 minutes</option>
-        </select>
+          <span>{selectedLabel}</span>
+          <svg
+            className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${durationOpen ? 'rotate-180' : ''}`}
+            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        {/* Dropdown options */}
+        {durationOpen && (
+          <motion.ul
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.15 }}
+            className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
+          >
+            {durationOptions.map(opt => (
+              <li
+                key={opt.value}
+                onClick={() => { setSelectedDuration(opt.value); setDurationOpen(false); }}
+                className={`flex items-center justify-between px-4 py-3 cursor-pointer text-base transition-colors ${
+                  selectedDuration === opt.value
+                    ? 'bg-teal-50 text-teal-800 font-medium'
+                    : 'text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <span>{opt.label}</span>
+                {selectedDuration === opt.value && (
+                  <svg className="w-4 h-4 text-teal-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </li>
+            ))}
+          </motion.ul>
+        )}
       </div>
 
       {/* Selected Date and Time Summary */}
@@ -647,8 +684,6 @@ const BookingForm = ({
   setAppointmentReason,
   appointmentUrgency,
   setAppointmentUrgency,
-  location,
-  setLocation,
   privateNotes, 
   setPrivateNotes, 
   onSubmit, 
@@ -658,11 +693,7 @@ const BookingForm = ({
   t 
 }) => {
   // Form validation
-  const isFormValid = () => {
-    if (!appointmentMode) return false;
-    if (appointmentMode === 'in-person' && !location.trim()) return false;
-    return true;
-  };
+  const isFormValid = () => Boolean(appointmentMode);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -729,7 +760,7 @@ const BookingForm = ({
           <label className="block text-sm font-medium text-gray-700 mb-3">
             Session Type <span className="text-red-500">*</span>
           </label>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
             <label className={`border-2 p-4 rounded-xl cursor-pointer transition-colors ${
               appointmentMode === 'chat' ? 'border-teal-800 bg-teal-50' : 'border-gray-200 hover:border-gray-300'
             }`}>
@@ -765,44 +796,8 @@ const BookingForm = ({
                 <div className="text-sm text-gray-600">Face-to-face video consultation</div>
               </div>
             </label>
-            
-            <label className={`border-2 p-4 rounded-xl cursor-pointer transition-colors ${
-              appointmentMode === 'in-person' ? 'border-teal-800 bg-teal-50' : 'border-gray-200 hover:border-gray-300'
-            }`}>
-              <input
-                type="radio"
-                name="appointmentMode"
-                value="in-person"
-                checked={appointmentMode === 'in-person'}
-                onChange={(e) => setAppointmentMode(e.target.value)}
-                className="sr-only"
-              />
-              <div className="text-center">
-                <div className="text-sm font-bold text-teal-700 mb-2">OM</div>
-                <div className="font-medium">Offline Meet</div>
-                <div className="text-sm text-gray-600">On-campus face-to-face meeting</div>
-              </div>
-            </label>
           </div>
         </div>
-
-        {/* Location (only for in-person) */}
-        {appointmentMode === 'in-person' && (
-          <div>
-            <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-2">
-              Meeting Location <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="location"
-              type="text"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-teal-700 focus:border-teal-700"
-              placeholder="Enter the meeting location (e.g., Counselling Center Room 101)"
-              required
-            />
-          </div>
-        )}
 
         {/* Appointment Reason */}
         <div>
@@ -875,8 +870,7 @@ const BookingForm = ({
               <span className="font-medium">3.</span>
               <span>
                 {appointmentMode === 'chat' && 'You\'ll get a secure chat link to join the session'}
-                {appointmentMode === 'video' && 'You\'ll receive a video call link for your session'}
-                {appointmentMode === 'in-person' && 'Meeting location details will be confirmed'}
+                {appointmentMode === 'video' && 'You\'ll join a video room at your scheduled time'}
               </span>
             </div>
             <div className="flex items-start space-x-2">

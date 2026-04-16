@@ -375,7 +375,7 @@ const StudentDashboard = () => {
                       })}
                       className="px-4 py-2 bg-teal-800 text-white text-sm font-medium rounded-xl hover:bg-teal-900 transition-colors"
                     >
-                      Start Chat
+                      {latestAppointment.mode === 'video' ? 'Start Video' : 'Start Chat'}
                     </button>
                   )}
                   <Link
@@ -433,7 +433,7 @@ const StudentDashboard = () => {
                       >
                         Chat
                       </button>
-                      {(appointment.mode === 'video' || appointment.mode === 'tele') && (
+                      {appointment.mode === 'video' && (
                         <button
                           onClick={() => startChatSession(appointment)}
                           className="px-4 py-2 border-2 border-teal-800 text-teal-800 text-sm font-medium rounded-xl hover:bg-teal-800 hover:text-white transition-all"

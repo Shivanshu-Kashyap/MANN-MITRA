@@ -174,6 +174,26 @@ class SessionStore:
             }
         return result
 
+    async def get_admin_sessions(
+        self,
+        limit: int = 200,
+        include_messages: bool = True,
+    ) -> list[dict]:
+        if self._db is None:
+            return []
+
+        projection = {"_id": 0}
+        if not include_messages:
+            projection["messages"] = 0
+
+        cursor = (
+            self._db["chat_sessions"]
+            .find({}, projection)
+            .sort("updated_at", -1)
+            .limit(limit)
+        )
+        return await cursor.to_list(length=limit)
+
     async def close(self):
         if self._client:
             self._client.close()

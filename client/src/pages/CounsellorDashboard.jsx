@@ -161,7 +161,7 @@ const DashboardTab = () => {
   }
 
   const formatTime = (dateString) => new Date(dateString).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
-  const getModeLabel = (mode) => { switch (mode?.toLowerCase()) { case 'video': return 'Video Call'; case 'tele': return 'Online Session'; case 'in-person': return 'In-Person'; default: return 'Session' } }
+  const getModeLabel = (mode) => { switch (mode?.toLowerCase()) { case 'video': return 'Video Call'; case 'tele': case 'chat': return 'Online Session'; case 'in-person': return 'In-Person'; default: return 'Session' } }
 
   const stats = [
     { label: "Today's Appointments", value: dashboardData.stats.today, sub: dashboardData.stats.today > 0 ? 'Schedule active' : 'No appointments today', accent: 'bg-teal-500' },
@@ -472,7 +472,7 @@ const AppointmentsTab = () => {
                           <div className="flex flex-wrap gap-1">
                             <button onClick={() => handleJoinSession(appointment)} className="text-teal-800 hover:bg-teal-50 text-xs px-2.5 py-1.5 border border-teal-200 rounded-lg transition-colors">
                               {appointment.mode === 'video' && 'Video'}
-                              {appointment.mode === 'tele' && 'Chat/Online'}
+                              {(appointment.mode === 'tele' || appointment.mode === 'chat') && 'Chat/Online'}
                               {appointment.mode === 'in-person' && 'Prepare'}
                             </button>
                             <button onClick={() => handleOpenCompleteForm(appointment)} className="text-emerald-700 hover:bg-emerald-50 text-xs px-2.5 py-1.5 border border-emerald-200 rounded-lg transition-colors">Finish</button>
