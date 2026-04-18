@@ -47,15 +47,15 @@ Institutions need a safe and scalable platform that can offer mental health assi
 
 ### Proposed Solution
 Mann-Mitra is built as a three-part system:
-- React frontend for students, counsellors, and admins
-- Node.js backend for authentication, booking, screening, forum, dashboards, and real-time communication
-- Buddy FastAPI service for AI chat, RAG-based response generation, risk scoring, and crisis alerts
+- React frontend for students, counsellors, admins, and moderators
+- Node.js backend for authentication, booking, screening, forum, dashboards, moderation, and real-time communication
+- Buddy FastAPI service for AI chat, RAG-based response generation, multi-signal risk scoring, and crisis alerts
 
 ### Methodology
-1. User interacts through the React web application.
-2. General platform features are handled by the Node.js API with MongoDB.
-3. Chat requests are sent to Buddy.
-4. Buddy retrieves relevant knowledge from ChromaDB and generates a grounded response.
+1. User enters through the React web application after role-based login or registration.
+2. General platform features such as appointments, screening, forum, and dashboards are handled by the Node.js API with MongoDB.
+3. AI chat requests are sent from the frontend to Buddy.
+4. Buddy loads past chat history, retrieves relevant knowledge from ChromaDB, and generates a grounded response.
 5. In parallel, Buddy performs multi-signal risk assessment:
    - Rule-based keyword analysis
    - LLM-based clinical triage
@@ -66,20 +66,23 @@ Mann-Mitra is built as a three-part system:
    - coping exercise,
    - counsellor recommendation,
    - or crisis escalation and admin alert.
+8. High and critical alerts are forwarded to the Node.js server and shown in the admin/counsellor monitoring flow.
 
 ---
 
 ## Slide 5 - System Architecture
 
 ### Architecture Explanation
-- The frontend provides separate workflows for students, counsellors, and admins.
-- The Node.js server manages authentication, appointments, screening records, forum, and dashboard APIs.
-- The Buddy service handles AI conversation, retrieval from the knowledge base, risk scoring, and alert generation.
-- MongoDB stores users, sessions, appointments, screenings, and alerts.
+- The frontend provides separate workflows for students, counsellors, admins, and moderators.
+- The Node.js server manages authentication, appointments, screening records, forum posts, moderation, and dashboard APIs.
+- The Buddy service handles AI conversation, retrieval from the knowledge base, risk scoring, coping support, and alert generation.
+- MongoDB stores users, appointments, screenings, forum data, chat sessions, and alerts.
 - ChromaDB stores embedded mental health knowledge chunks for semantic retrieval.
+- Buddy sends high-risk and critical-risk alerts to the Node.js server, which supports real-time dashboard notification.
 
 ### Use the architecture diagram created for:
 - overall platform flow
+- entry points: screening, chat, forum, booking, admin monitoring
 - integration between frontend, Node.js server, Buddy, MongoDB, and ChromaDB
 
 ---
@@ -103,6 +106,12 @@ Mann-Mitra is built as a three-part system:
    - High: strong counselling recommendation and alert
    - Critical: crisis response, helplines, and immediate alert
 
+### End-to-End Working of the Platform
+- Screening flow: student completes PHQ-9 or GAD-7, score is stored, and high-risk cases are available for counsellor/admin review.
+- Forum flow: users create posts, content filter checks for harmful language, flagged posts go to moderation, and severe content can trigger alerts.
+- Booking flow: student views counsellor availability, books a session, and later continues communication through the chat platform.
+- Admin flow: dashboard shows counsellor management, risk monitoring, and system-level follow-up support.
+
 ### Key Design Choice
 - Conservative max ensemble is used because in mental health systems, missing a high-risk user is more dangerous than producing a false positive.
 
@@ -111,29 +120,26 @@ Mann-Mitra is built as a three-part system:
 ## Slide 7 - Results, Analysis & Demo
 
 ### Results
-- The platform successfully integrates:
-  - student support features,
-  - AI chat,
-  - screening,
-  - counsellor booking,
-  - admin monitoring,
-  - and crisis alert support.
+- The platform successfully integrates student support features, AI chat, screening, counsellor booking, forum interaction, admin monitoring, and crisis alert support.
 - Buddy produces grounded responses using retrieval from a curated mental health knowledge base.
 - The risk engine does not rely on a single method; it combines rule-based, LLM-based, and semantic signals.
 - High and critical risk conversations trigger stronger intervention logic and alert generation.
+- Forum safety is supported through content filtering, moderation status, and escalation handling for harmful posts.
 
 ### Analysis
 - The use of RAG improves relevance compared to a generic chatbot.
 - Multi-signal scoring improves safety over only keyword-based detection.
 - The system is robust because if the LLM risk scorer is unavailable, rule-based and semantic scoring still continue.
 - Separation of frontend, platform backend, and AI microservice makes the system modular and scalable.
+- Role-based flows make the system suitable for institutional deployment.
 
 ### Demo Screenshots to Include
 - Student dashboard
 - Screening page
 - Buddy chat interface
 - Chat response with coping exercise / counsellor recommendation
-- High-risk or critical-risk response flow
+- Forum page with anonymous posting/moderation view
+- Booking page
 - Admin risk dashboard or alert view
 
 ---
@@ -141,8 +147,8 @@ Mann-Mitra is built as a three-part system:
 ## Slide 8 - Conclusion & Future Scope
 
 ### Conclusion
-- Mann-Mitra is a complete institutional mental health support platform.
-- It combines screening, AI-assisted support, knowledge-grounded response generation, risk assessment, and escalation support in one system.
+- Mann-Mitra is an institutional mental health support platform with multiple entry points for support.
+- It combines screening, AI-assisted support, anonymous peer interaction, counsellor booking, knowledge-grounded response generation, risk assessment, and escalation support in one system.
 - The project improves accessibility, early risk identification, and connection between students and professional support services.
 
 ### Future Scope
